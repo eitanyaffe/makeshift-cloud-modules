@@ -1,0 +1,2 @@
+mkdir -p $MAKESHIFT_ROOT
+gcsfuse --implicit-dirs $MAKESHIFT_BUCKET_BASE $MAKESHIFT_ROOT
