@@ -27,6 +27,9 @@ gcp_rb:
 	echo "Bucket $(GCP_MOUNT_BUCKET) does not exists, skipping" \
 	; fi
 
+destroy_bucket:
+	$(MAKE) class_step class=gmount instance=$i t=gcp_rb
+
 destroy_buckets:
 	$(MAKE) class_loop class=gmount t=gcp_rb
 
@@ -34,18 +37,30 @@ destroy_buckets:
 # mount buckets locally
 ###############################################################################################
 
-mount_bucket:
-	mkdir -p $(GCP_MOUNT_VAR)
+gcp_mount:
+	@gsutil ls $(GCP_MOUNT_BUCKET) > /dev/null 2>&1; if [ $$? -eq 0 ]; then \
+	mkdir -p $(GCP_MOUNT_VAR) && \
 	gcsfuse $(GCP_GCSFUSE_EXTRA) \
 		-o allow_other \
 		--file-mode $(GCP_MOUNT_FILE_MODE) \
 		--key-file $(GCP_KEY_FILE) \
 		$(GCP_MOUNT_BUCKET_SHORT) \
-		$(GCP_MOUNT_VAR)
+		$(GCP_MOUNT_VAR) \
+	; else \
+	echo "Bucket does not $(GCP_MOUNT_BUCKET) exists, skipping mount command" \
+	; fi
+
+# create and mount
+gcp_create_mount: gcp_mb gcp_mount
+
+mount_bucket:
+	$(MAKE) class_step class=gmount instance=$i t=gcp_mount
+
+create_mount_bucket:
+	$(MAKE) class_step class=gmount instance=$i t=gcp_create_mount
 
 mount_buckets:
-	$(MAKE) class_loop class=gmount t=mount_bucket
-
+	$(MAKE) class_loop class=gmount t=gcp_mount
 
 ###############################################################################################
 # mount buckets locally under home, useful to view results

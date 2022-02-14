@@ -11,13 +11,15 @@ GCP_PIPELINE_RELATIVE_DIR:=$(subst $(MAKESHIFT_ROOT)/,,$(CURDIR))
 ###############################################################################################
 
 # makeshift code placed in bucket
-GCP_MAKESHIFT_BUCKET_VER?=v1
-GCP_MAKESHIFT_BUCKET_BASE?=makeshift-$(PAR_MS_PROJECT_NAME)-$(GCP_MAKESHIFT_BUCKET_VER)
+GCP_MAKESHIFT_BUCKET_BASE?=ms-$(PAR_MS_PROJECT_NAME)-code
 GCP_MAKESHIFT_BUCKET?=gs://$(GCP_MAKESHIFT_BUCKET_BASE)
 
 # makeshift config files placed in a separate bucket
-GCP_MAKESHIFT_CONFIG_BUCKET_BASE?=makeshift-config-$(PAR_MS_PROJECT_NAME)-$(GCP_MAKESHIFT_BUCKET_VER)
+GCP_MAKESHIFT_CONFIG_BUCKET_BASE?=ms-$(PAR_MS_PROJECT_NAME)-config
 GCP_MAKESHIFT_CONFIG_BUCKET?=gs://$(GCP_MAKESHIFT_CONFIG_BUCKET_BASE)
+
+# compiled programs placed in separate bucket
+BINARY_BUCKET?=gs://ms-$(PIPELINE_NAME)-bin
 
 # explicitely include all relevant modules
 GCP_MAKESHIFT_MODULES?=par gcp
@@ -46,7 +48,6 @@ GCP_GCR_HOSTNAME=gcr.io
 GCP_GCR_IMAGE_PATH=$(GCP_GCR_HOSTNAME)/$(GCP_PROJECT_ID)/$(GCP_IMAGE_NAME)
 
 GCP_DSUB_PROVIDER?=google-cls-v2
-
 
 ###############################################################################################
 # basic input/output dirs

@@ -17,7 +17,7 @@ denv:
 	       -v /var/run/docker.sock:/var/run/docker.sock \
 	       -w /makeshift/$(GCP_PIPELINE_RELATIVE_DIR) \
 	       $(GCP_GCR_IMAGE_PATH) \
-		bash -c "echo \"export PS1='[[$(PAR_MS_PROJECT_NAME)]] \w % '\" >> ~/.bashrc && make pm && bash"
+		bash -c "echo \"export PS1='[[$(PAR_MS_PROJECT_NAME)]] \w % '\" >> ~/.bashrc && make m=gcp mount_buckets && bash"
 
 # run in VM
 venv:
