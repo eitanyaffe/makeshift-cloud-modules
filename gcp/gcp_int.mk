@@ -2,7 +2,7 @@ units:=gcp_dsub.mk gcp_env.mk gcp_sync.mk gcp_image.mk gcp_buckets.mk gcp_downlo
 $(call _register_module,gcp,$(units),)
 
 # json key file
-GCP_KEY_FILE?=$(MAKESHIFT_ROOT)/key.json
+GCP_KEY_FILE?=$(GOOGLE_APPLICATION_CREDENTIALS)
 
 GCP_PIPELINE_RELATIVE_DIR:=$(subst $(MAKESHIFT_ROOT)/,,$(CURDIR))
 

@@ -7,8 +7,8 @@ denv:
 	       -v $(MAKESHIFT_ROOT):/makeshift \
 	       -e MAKESHIFT_CONFIG=/makeshift-config \
 	       -v $(MAKESHIFT_CONFIG):/makeshift-config \
-	       -v $(GCP_KEY):/makeshift/key.json \
-	       -e GOOGLE_APPLICATION_CREDENTIALS=/makeshift/key.json \
+	       -v $(dir $(MAKESHIFT_GCP_KEY)):/keys \
+	       -e GOOGLE_APPLICATION_CREDENTIALS=/keys/$(notdir $(MAKESHIFT_GCP_KEY)) \
 	       -e SENDGRID_API_KEY=$(SENDGRID_API_KEY) \
 	       -e BOTO_CONFIG=/makeshift/.boto \
 	       -e USER=$(USER) \

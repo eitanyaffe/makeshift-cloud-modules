@@ -22,7 +22,7 @@ make_bucket:
 
 gcp_rb:
 	gsutil ls $(GCP_MOUNT_BUCKET) > /dev/null 2>&1; if [ $$? -eq 0 ]; then \
-	gsutil rm -f -R $(GCP_MOUNT_BUCKET)/*; gsutil rb -f $(GCP_MOUNT_BUCKET) \
+	gsutil -mq rm -f -R $(GCP_MOUNT_BUCKET)/*; gsutil rb -f $(GCP_MOUNT_BUCKET) \
 	; else \
 	echo "Bucket $(GCP_MOUNT_BUCKET) does not exists, skipping" \
 	; fi
@@ -47,7 +47,7 @@ gcp_mount:
 		$(GCP_MOUNT_BUCKET_SHORT) \
 		$(GCP_MOUNT_VAR) \
 	; else \
-	echo "Bucket does not $(GCP_MOUNT_BUCKET) exists, skipping mount command" \
+	echo "Error mounting $(GCP_MOUNT_BUCKET), skipping" \
 	; fi
 
 # create and mount

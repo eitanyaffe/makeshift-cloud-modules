@@ -170,7 +170,7 @@ PAR_NOTIFY_MESSAGE?=this happened
 # report nested jobs up to this level
 PAR_NOTIFY_MAX_LEVEL?=2
 
-PAR_SENDGRID_API_KEY?=$(SENDGRID_API_KEY)
+PAR_SENDGRID_API_KEY?=$(if $(SENDGRID_API_KEY),$(SENDGRID_API_KEY),NONE)
 
 ####################################################################################
 # export data
