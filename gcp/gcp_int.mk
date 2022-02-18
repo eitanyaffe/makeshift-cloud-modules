@@ -47,6 +47,10 @@ GCP_IMAGE_NAME=mdocker-base
 GCP_GCR_HOSTNAME=gcr.io
 GCP_GCR_IMAGE_PATH=$(GCP_GCR_HOSTNAME)/$(GCP_PROJECT_ID)/$(GCP_IMAGE_NAME)
 
+GCP_DOCKERHUB_BASE?=eitanyaffe
+GCP_DOCKERHUB_IMAGE_VER?=v1.00
+GCP_DOCKERHUB_IMAGE=$(GCP_DOCKERHUB_BASE)/$(GCP_IMAGE_NAME):$(GCP_DOCKERHUB_IMAGE_VER)
+
 GCP_DSUB_PROVIDER?=google-cls-v2
 
 ###############################################################################################
