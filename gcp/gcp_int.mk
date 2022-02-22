@@ -2,7 +2,7 @@ units:=gcp_dsub.mk gcp_env.mk gcp_sync.mk gcp_image.mk gcp_buckets.mk gcp_downlo
 $(call _register_module,gcp,$(units),)
 
 # json key file
-GCP_KEY_FILE?=$(GOOGLE_APPLICATION_CREDENTIALS)
+GCP_KEY_FILE?=$(if $(GOOGLE_APPLICATION_CREDENTIALS),$(GOOGLE_APPLICATION_CREDENTIALS),$(MAKESHIFT_ROOT)/keys/makeshift.json)
 
 GCP_PIPELINE_RELATIVE_DIR:=$(subst $(MAKESHIFT_ROOT)/,,$(CURDIR))
 
@@ -30,7 +30,7 @@ GCP_MAKESHIFT_EXTRA?=
 # account details
 ###############################################################################################
 
-GCP_PROJECT_ID?=relman-yaffe
+GCP_PROJECT_ID?=$(MAKESHIFT_GCP_PROJECT_ID)
 
 # default dsub regions
 GCP_REGION?=us-west1

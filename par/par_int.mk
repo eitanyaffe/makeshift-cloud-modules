@@ -21,7 +21,7 @@ PAR_MODULE?=libs
 PAR_NAME?=job_name
 
 # for billing purposes
-PAR_MS_PROJECT_NAME?=project_name
+PAR_MS_PROJECT_NAME?=specify_project_name
 
 # parent directory, where we save the job labels and task file
 PAR_WORK_DIR?=specify_work_dir

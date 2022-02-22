@@ -1,14 +1,24 @@
+validate_env:
+	$(call _assert,MAKESHIFT_ROOT MAKESHIFT_CONFIG MAKESHIFT_GCP_PROJECT_ID)
+	@echo "====================================================================================="
+	@echo "MakeShift environment variables:"
+	@echo MAKESHIFT_ROOT=$(MAKESHIFT_ROOT)
+	@echo MAKESHIFT_CONFIG=$(MAKESHIFT_CONFIG)
+	@echo MAKESHIFT_GCP_PROJECT_ID=$(MAKESHIFT_GCP_PROJECT_ID)
+	@echo "====================================================================================="
+
 # run image locally with X11
-denv:
+denv: validate_env
 	docker run --rm -it --privileged \
 	       -v /tmp/.X11-unix:/tmp/.X11-unix \
 	       -e DISPLAY=host.docker.internal:0 \
 	       -e MAKESHIFT_ROOT=/makeshift \
 	       -v $(MAKESHIFT_ROOT):/makeshift \
 	       -e MAKESHIFT_CONFIG=/makeshift-config \
+	       -e MAKESHIFT_GCP_PROJECT_ID=$(MAKESHIFT_GCP_PROJECT_ID) \
 	       -v $(MAKESHIFT_CONFIG):/makeshift-config \
-	       -v $(dir $(MAKESHIFT_GCP_KEY)):/keys \
-	       -e GOOGLE_APPLICATION_CREDENTIALS=/keys/$(notdir $(MAKESHIFT_GCP_KEY)) \
+	       -v $(dir $(MAKESHIFT_GCP_KEY)):/makeshift/keys \
+	       -e GOOGLE_APPLICATION_CREDENTIALS=/makeshift/keys/$(notdir $(MAKESHIFT_GCP_KEY)) \
 	       -e SENDGRID_API_KEY=$(SENDGRID_API_KEY) \
 	       -e BOTO_CONFIG=/makeshift/.boto \
 	       -e USER=$(USER) \
