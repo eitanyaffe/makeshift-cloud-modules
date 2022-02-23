@@ -20,7 +20,7 @@ denv: validate_env
 	       -v $(dir $(MAKESHIFT_GCP_KEY)):/keys \
 	       -e GOOGLE_APPLICATION_CREDENTIALS=/keys/$(notdir $(MAKESHIFT_GCP_KEY)) \
 	       -e SENDGRID_API_KEY=$(PAR_SENDGRID_API_KEY) \
-	       -e MAKESHIFT_EMAIL=$(MAKESHIFT_EMAIL) \
+	       -e PAR_NOTIFY_EMAIL=$(PAR_NOTIFY_EMAIL) \
 	       -e BOTO_CONFIG=/makeshift/.boto \
 	       -e USER=$(USER) \
 	       -e c=$(c) \
