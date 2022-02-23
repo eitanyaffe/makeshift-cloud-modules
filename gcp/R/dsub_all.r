@@ -207,6 +207,7 @@ dsub.base=function(job.work.dir,
                    ms.level,
                    job.id,
                    job.keys,
+                   email,
                    sendgrid.key,
                    use.private)
 {
@@ -263,7 +264,9 @@ dsub.base=function(job.work.dir,
     if (use.private)
         command = paste(command, "--use-private-address")
 
+    # email variables
     command  = paste(command, "--env", paste0("SENDGRID_API_KEY=", sendgrid.key))
+    command  = paste(command, "--env", paste0("MAKESHIFT_EMAIL=", email))
 
     # append config
     cfg = Sys.getenv("c")
@@ -366,7 +369,7 @@ dsub.run=function(command, dry, wait, project, provider, job.keys, ms.level, job
         delete.subtree.tasks(job.key=job.keys[N], project=project, provider=provider, ms.level=ms.level)
     }
 
-    if (send.email.flag) {
+    if (send.email.flag && email != "NONE" && sendgrid.key != "NONE") {
         if (wait && (job.rc != 0 || ms.level <= max.report.level)) {
             email.subject = sprintf("MS: %s/%d/%s: %s", job.id, ms.level, ms.title, if (job.rc == 0) "done" else "error")
             labels = paste0("<br>", 1:ms.level, ") ms-job-key-", 1:ms.level, "=", job.keys, collapse=" ")
@@ -503,6 +506,7 @@ dsub.ms=function(job.work.dir,
                       job.id=job.id,
                       batch.index=0,
                       sendgrid.key=sendgrid.key,
+                      email=email,
                       ms.level=ms.level,
                       use.private=!send.email.flag)
 
@@ -649,6 +653,7 @@ dsub.ms.tasks=function(job.work.dir,
                       job.keys=job.keys,
                       job.id=job.id,
                       batch.index=batch.index,
+                      email=email,
                       sendgrid.key=sendgrid.key,
                       ms.level=ms.level,
                       use.private=!send.email.flag)
@@ -840,6 +845,7 @@ dsub.ms.complex=function(job.work.dir,
                       job.keys=job.keys,
                       job.id=job.id,
                       batch.index=batch.index,
+                      email=email,
                       sendgrid.key=sendgrid.key,
                       ms.level=ms.level,
                       use.private=!send.email.flag)
@@ -1014,6 +1020,7 @@ dsub.direct=function(job.work.dir,
                       job.keys=job.keys,
                       job.id=job.id,
                       batch.index=0,
+                      email=email,
                       sendgrid.key=sendgrid.key,
                       ms.level=ms.level,
                       use.private=F)

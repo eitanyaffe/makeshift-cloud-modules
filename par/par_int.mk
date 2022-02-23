@@ -161,7 +161,7 @@ PAR_DIRECT_COMMAND?=command
 ###############################################################################################
 
 # email addresses
-PAR_NOTIFY_EMAIL?=eitan.yaffe@stanford.edu
+PAR_NOTIFY_EMAIL?=$(if $(MAKESHIFT_EMAIL),$(MAKESHIFT_EMAIL),NONE)
 
 # message content
 PAR_NOTIFY_SUBJECT?=something happened
