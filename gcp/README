@@ -35,7 +35,7 @@ sudo journalctl -u konlet-startup
 cat keyfile.json | docker login -u _json_key --password-stdin https://gcr.io
 
 # run docker inside VM
-docker run --rm -it --privileged --tty -e DISPLAY=host.docker.internal:0 -v /var/run/docker.sock:/var/run/docker.sock gcr.io/relman-yaffe/mdocker-base /bin/bash
+docker run --rm -it --privileged --tty -e DISPLAY=host.docker.internal:0 -v /var/run/docker.sock:/var/run/docker.sock gcr.io/relman-yaffe/mdocker-metagenomics /bin/bash
 
 
 # check disks

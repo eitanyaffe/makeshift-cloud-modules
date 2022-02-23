@@ -43,7 +43,7 @@ GCP_LOCATION?=us-west1
 # mdocker image
 ###############################################################################################
 
-GCP_IMAGE_NAME=mdocker-base
+GCP_IMAGE_NAME=mdocker-metagenomics
 GCP_GCR_HOSTNAME=gcr.io
 GCP_GCR_IMAGE_PATH=$(GCP_GCR_HOSTNAME)/$(GCP_PROJECT_ID)/$(GCP_IMAGE_NAME)
 
