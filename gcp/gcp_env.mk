@@ -17,8 +17,8 @@ denv: validate_env
 	       -e MAKESHIFT_CONFIG=/makeshift-config \
 	       -e MAKESHIFT_GCP_PROJECT_ID=$(MAKESHIFT_GCP_PROJECT_ID) \
 	       -v $(MAKESHIFT_CONFIG):/makeshift-config \
-	       -v $(dir $(MAKESHIFT_GCP_KEY)):/makeshift/keys \
-	       -e GOOGLE_APPLICATION_CREDENTIALS=/makeshift/keys/$(notdir $(MAKESHIFT_GCP_KEY)) \
+	       -v $(dir $(MAKESHIFT_GCP_KEY)):/keys \
+	       -e GOOGLE_APPLICATION_CREDENTIALS=/keys/$(notdir $(MAKESHIFT_GCP_KEY)) \
 	       -e SENDGRID_API_KEY=$(SENDGRID_API_KEY) \
 	       -e BOTO_CONFIG=/makeshift/.boto \
 	       -e USER=$(USER) \
