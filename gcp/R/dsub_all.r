@@ -266,7 +266,7 @@ dsub.base=function(job.work.dir,
 
     # email variables
     command  = paste(command, "--env", paste0("SENDGRID_API_KEY=", sendgrid.key))
-    command  = paste(command, "--env", paste0("MAKESHIFT_EMAIL=", email))
+    command  = paste(command, "--env", paste0("PAR_NOTIFY_EMAIL=", email))
 
     # append config
     cfg = Sys.getenv("c")
