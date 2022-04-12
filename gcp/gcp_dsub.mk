@@ -13,10 +13,9 @@ GCP_DSUB_ODIR=$($(GCP_DSUB_ODIR_VAR))
 
 DSUB_WORK_DIR?=$(GCP_DSUB_ODIR)/dsub/$(GCP_DSUB_NAME)
 
-DSUB_TASK_ITEM_ODIR=$(foreach X,$(GCP_DSUB_TASK_ITEM_VALS),$(call reval,$(GCP_DSUB_TASK_ODIR_VAR),$(GCP_DSUB_TASK_ITEM_VAR)=$X))
-
-#DSUB_TASK_ITEM_EXIST=$(call _to_bucket,$(foreach X,\
-#$(GCP_DSUB_TASK_ITEM_VALS),$(call reval,$(shell $(MAKE) -q $(GCP_DSUB_TARGET); echo $?)),$(GCP_DSUB_TASK_ITEM_VAR)=$X)))
+#DSUB_TASK_ITEM_ODIR=$(foreach X,$(GCP_DSUB_TASK_ITEM_VALS),$(call reval,$(GCP_DSUB_TASK_ODIR_VAR),$(GCP_DSUB_TASK_ITEM_VAR)=$X))
+DSUB_TASK_ITEM_ODIR=$(foreach X,$(GCP_DSUB_TASK_ITEM_VALS),\
+$(subst $(GCP_DSUB_ODIR_BUCKET_BASE)/,,$(call reval,$(GCP_DSUB_TASK_ODIR_VAR),$(GCP_DSUB_TASK_ITEM_VAR)=$X)))
 
 dsub:
 	$(_R) $(_md)/R/dsub_all.r dsub.ms \
@@ -192,17 +191,23 @@ dsub_direct:
 	       command='$(GCP_DSUB_DIRECT_COMMAND)' \
 	       ifn.vars="$(GCP_DSUB_DIRECT_IFN_VARS)" \
 	       ifn.paths="$(foreach X,$(GCP_DSUB_DIRECT_IFN_VARS),$($X))" \
+	       idir.vars="$(GCP_DSUB_DIRECT_IDIR_VARS)" \
+	       idir.paths="$(foreach X,$(GCP_DSUB_DIRECT_IDIR_VARS),$($X))" \
+	       idir.buckets="$(GCP_DSUB_DIRECT_IDIR_BUCKETS)" \
+	       idir.basedirs="$(GCP_DSUB_DIRECT_IDIR_BASEDIRS)" \
 	       ofn.vars="$(GCP_DSUB_DIRECT_OFN_VARS)" \
 	       ofn.paths="$(foreach X,$(GCP_DSUB_DIRECT_OFN_VARS),$($X))" \
 	       odir.vars="$(GCP_DSUB_DIRECT_ODIR_VARS)" \
 	       odir.paths="$(foreach X,$(GCP_DSUB_DIRECT_ODIR_VARS),$($X))" \
 	       drop.params=$(GCP_DSUB_DROP_PARAMS) \
+	       ms.root=$(GCP_MAKESHIFT_BUCKET) \
 	       ms.level=$(MS_LEVEL) \
 	       job.id=$(PAR_JOB_ID) \
 	       email=$(PAR_NOTIFY_EMAIL) \
 	       max.report.level=$(PAR_NOTIFY_MAX_LEVEL) \
 	       send.email.flag=$(PAR_EMAIL) \
 	       sendgrid.key=$(PAR_SENDGRID_API_KEY) \
+	       save.job.stats=$(DSUB_SAVE_JOB_STATS) \
 	       params="DUMMY~1 $(subst =,~,$(GCP_DSUB_MAKEFLAGS))"
 
 dsub_update_local:
@@ -211,9 +216,6 @@ dsub_update_local:
 	gsutil -mq du -e "*/.dsub/*" -sh $(GCP_RSYNC_TARGET_BUCKET); \
 	gsutil -mq rsync -r -u -x ".*\.dsub.*" $(GCP_RSYNC_TARGET_BUCKET) $($(GCP_RSYNC_SRC_VAR)) \
 	; fi
-
-dsub_check_space:
-	df -h $($(GCP_RSYNC_SRC_VAR)) > $($(GCP_RSYNC_SRC_VAR))/.df
 
 # required in order to run with private network
 # see: https://github.com/DataBiosphere/dsub/blob/main/docs/compute_resources.md

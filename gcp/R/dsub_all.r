@@ -12,10 +12,14 @@ create.final.stamp.command=function(job.keys, out.var, is.dir=T)
 
 path2bucket=function(path, out.bucket, base.mount)
 {
-    if (grepl(base.mount, path)) {
-        return (gsub(base.mount, out.bucket, path))
+    if (substr(path,1,1) == "/") {
+        if (grepl(base.mount, path)) {
+            return (gsub(base.mount, out.bucket, path))
+        } else {
+            return (gsub("/mnt/data/output/gs/", "gs://", path))
+        }
     } else {
-        return (gsub("gs/", "gs://", gsub("/mnt/data/output/", "", path)))
+        return (paste0(out.bucket, "/", path))
     }
 }
 
@@ -207,6 +211,7 @@ dsub.base=function(job.work.dir,
                    ms.level,
                    job.id,
                    job.keys,
+                   max.report.level,
                    email,
                    sendgrid.key,
                    use.private)
@@ -250,6 +255,7 @@ dsub.base=function(job.work.dir,
                     paste0("--label 'ms-level=", ms.level+1, "'", collapse="", sep=""),
                     "--env", paste0("MS_LEVEL=", ms.level+1),
                     "--env", paste0("PAR_JOB_ID=", job.id),
+                    "--env", paste0("PAR_NOTIFY_MAX_LEVEL=", max.report.level),
                     paste0("--label 'ms-job-id=", job.id, "'", collapse="", sep=""),
                     "--name", name,
                     "--env", paste0("GCP_PROJECT_ID=", project),
@@ -373,7 +379,7 @@ dsub.run=function(command, dry, wait, project, provider, job.keys, ms.level, job
         if (wait && (job.rc != 0 || ms.level <= max.report.level)) {
             email.subject = sprintf("MS: %s/%d/%s: %s", job.id, ms.level, ms.title, if (job.rc == 0) "done" else "error")
             labels = paste0("<br>", 1:ms.level, ") ms-job-key-", 1:ms.level, "=", job.keys, collapse=" ")
-            email.ll = list(Project=project.name, Job_type=ms.type, Level=ms.level, Command=paste(ms.desc, collapse=" "), Return_code=job.rc, Logs=logging, Labels=labels)
+            email.ll = list(Sender="Makeshift_pipeline_messenger", Project=project.name, Job_type=ms.type, Level=ms.level, Command=paste(ms.desc, collapse=" "), Return_code=job.rc, Logs=logging, Labels=labels)
             email.message = format.email.message(email.ll)
             
             # get logs
@@ -506,6 +512,7 @@ dsub.ms=function(job.work.dir,
                       job.id=job.id,
                       batch.index=0,
                       sendgrid.key=sendgrid.key,
+                      max.report.level=max.report.level,
                       email=email,
                       ms.level=ms.level,
                       use.private=!send.email.flag)
@@ -524,12 +531,15 @@ dsub.ms=function(job.work.dir,
     make.command = paste0(make.command, make.base)
 
     # check free space at end of command
-    make.command = paste0(make.command, " && make m=gcp dsub_check_space")
+    make.command = paste0(make.command)
 
     # add file with job key that is created after job is done
     make.command = paste0(make.command, " && ", create.final.stamp.command(job.keys=job.keys, out.var=out.var))
 
-    ds = paste0("'cd ${MAKESHIFT_ROOT}/", wdir, " ; echo \"Running commands: ", make.command, "\"; ", make.command, "'")
+    command.start = paste0("bash ${MAKESHIFT_ROOT}/makeshift-core/job_start.sh ${", out.var, "}")
+    command.end = paste0("bash ${MAKESHIFT_ROOT}/makeshift-core/job_end.sh ${", out.var, "}")
+    
+    ds = paste0("'", command.start, " && cd ${MAKESHIFT_ROOT}/", wdir, " ; echo \"Running commands: ", make.command, "\"; ", make.command, " && ", command.end, "'")
     command = paste(dbase$command,
                     "--command", ds,
                     "--input-recursive", paste0("MAKESHIFT_ROOT=", ms.root),
@@ -655,6 +665,7 @@ dsub.ms.tasks=function(job.work.dir,
                       batch.index=batch.index,
                       email=email,
                       sendgrid.key=sendgrid.key,
+                      max.report.level=max.report.level,
                       ms.level=ms.level,
                       use.private=!send.email.flag)
 
@@ -724,13 +735,16 @@ dsub.ms.tasks=function(job.work.dir,
     make.command = paste0(make.command, make.base)
 
     # check free space at end of command
-    make.command = paste0(make.command, " && make m=gcp dsub_check_space")
+    make.command = paste0(make.command)
 
     # add file with job key that is created after job is done
     make.command = paste0(make.command, " && ", create.final.stamp.command(job.keys=job.keys, out.var=task.odir.var))
+
+    command.start = paste0("bash ${MAKESHIFT_ROOT}/makeshift-core/job_start.sh ${", task.odir.var, "}")
+    command.end = paste0("bash ${MAKESHIFT_ROOT}/makeshift-core/job_end.sh ${", task.odir.var, "}")
     
-    ds = paste0("'cd ${MAKESHIFT_ROOT}/", wdir, " ; echo \"Running commands: ",
-                make.command, "\"; ", make.command, "'")
+    ds = paste0("'", command.start, " && cd ${MAKESHIFT_ROOT}/", wdir, " ; echo \"Running commands: ",
+                make.command, "\"; ", make.command, " && ", command.end, "'")
     command = paste(dbase$command,
                     "--input-recursive", paste0("MAKESHIFT_ROOT=", ms.root),
                     "--input-recursive", paste0("MAKESHIFT_CONFIG=", ms.cfg),
@@ -755,6 +769,7 @@ dsub.ms.tasks=function(job.work.dir,
 dsub.ms.complex.batch=function(task.input.table, task.odir.vals, batch.size, ...)
 {
     df.tasks = load.table(task.input.table)
+
     N = dim(df.tasks)[1]
     if (N <= batch.size) {
         dsub.ms.complex(df.tasks=df.tasks, task.odir.vals=task.odir.vals, batch.index=0, ...)
@@ -847,6 +862,7 @@ dsub.ms.complex=function(job.work.dir,
                       batch.index=batch.index,
                       email=email,
                       sendgrid.key=sendgrid.key,
+                      max.report.level=max.report.level,
                       ms.level=ms.level,
                       use.private=!send.email.flag)
         
@@ -916,11 +932,17 @@ dsub.ms.complex=function(job.work.dir,
     make.base = paste0("make ", target, " ", task.params, " ", params.str)
     make.command = paste0(make.command, make.base)
 
+    # check free space at end of command
+    make.command = paste0(make.command)
+    
     # add file with job key that is created after job is done
     make.command = paste0(make.command, " && ", create.final.stamp.command(job.keys=job.keys, out.var=task.odir.var))
+
+    command.start = paste0("bash ${MAKESHIFT_ROOT}/makeshift-core/job_start.sh ${", task.odir.var, "}")
+    command.end = paste0("bash ${MAKESHIFT_ROOT}/makeshift-core/job_end.sh ${", task.odir.var, "}")
     
-    ds = paste0("'cd ${MAKESHIFT_ROOT}/", wdir, " ; echo \"Running commands: ",
-                make.command, "\"; ", make.command, "'")
+    ds = paste0("'", command.start, " && cd ${MAKESHIFT_ROOT}/", wdir, " ; echo \"Running commands: ",
+                make.command, "\"; ", make.command, " && ", command.end, "'")
     command = paste(dbase$command,
                     "--input-recursive", paste0("MAKESHIFT_ROOT=", ms.root),
                     "--input-recursive", paste0("MAKESHIFT_CONFIG=", ms.cfg),
@@ -951,7 +973,6 @@ dsub.direct=function(job.work.dir,
                      zones,
                      region,
                      image,
-                     ms.root,
                      ms.cfg,
                      machine.spec.style,
                      machine.type,
@@ -970,6 +991,10 @@ dsub.direct=function(job.work.dir,
                      odir.vars,
                      ifn.paths,
                      ofn.paths,
+                     idir.vars,
+                     idir.paths,
+                     idir.buckets,
+                     idir.basedirs,
                      odir.paths,
                      odir.var,
                      out.dir,
@@ -979,19 +1004,21 @@ dsub.direct=function(job.work.dir,
                      log.interval,
                      params,
                      ms.level,
+                     ms.root,
                      job.id,
                      email,
                      max.report.level,
                      send.email.flag,
                      sendgrid.key,
+                     save.job.stats,
                      drop.params)
 {
     job.keys = get.job.keys(ms.level=ms.level, name=name)
     pp = parse.params(params=params, drop.params=drop.params)
     params.str = pp$params
 
-    out.dir = path2bucket(path=out.dir, out.bucket=out.bucket, base.mount=base.mount)
-    out.file = paste0(out.dir, "/.done_dsub_task")
+    out.path = path2bucket(path=out.dir, out.bucket=out.bucket, base.mount=base.mount)
+    out.file = paste0(out.path, "/.done_dsub_task")
     
     # note: can't use private network because image is not on GCR
     dbase = dsub.base(job.work.dir=job.work.dir,
@@ -1022,6 +1049,7 @@ dsub.direct=function(job.work.dir,
                       batch.index=0,
                       email=email,
                       sendgrid.key=sendgrid.key,
+                      max.report.level=max.report.level,
                       ms.level=ms.level,
                       use.private=F)
     
@@ -1031,34 +1059,60 @@ dsub.direct=function(job.work.dir,
     command = paste0(command, " && ", create.final.stamp.command(job.keys=job.keys, out.var="GCP_DSUB_DONE_FILE", is.dir=F))
 
     cat(sprintf("container command: %s\n", paste0(command)))
+
+    if (save.job.stats) {
+        command.start = paste0("bash ${MAKESHIFT_ROOT}/makeshift-core/job_start.sh ${", odir.var, "}")
+        command.end = paste0("bash ${MAKESHIFT_ROOT}/makeshift-core/job_end.sh ${", odir.var, "}")
+        
+        dsub.command = paste(dbase$command,
+                             "--command", paste0("'", command.start, " && ", command, " && ", command.end, "'"),
+                             paste0("--output GCP_DSUB_DONE_FILE=", out.file))
+    } else {
+        dsub.command = paste(dbase$command,
+                             "--command", paste0("'", command, "'"),
+                             paste0("--output GCP_DSUB_DONE_FILE=", out.file))
+    }
     
-    dsub.command = paste(dbase$command,
-                         "--command", paste0("'", command, "'"),
-                         paste0("--output GCP_DSUB_DONE_FILE=", out.file))
-    
+    # input files
     for (i in 1:length(ifn.vars)) {
         obucket = path2bucket(path=ifn.paths[i], out.bucket=out.bucket, base.mount=base.mount)
         dsub.command  = paste0(dsub.command,
                                " --input ", ifn.vars[i], "=", obucket)
     }
+
+    # input dirs
+    for (i in 1:length(idir.vars)) {
+        if (is.na(idir.vars[i]) || idir.vars[i] == "NA")
+            next
+        obucket = path2bucket(path=idir.paths[i], out.bucket=idir.buckets[i], base.mount=idir.basedirs[i])
+        dsub.command  = paste0(dsub.command,
+                               " --input-recursive ", idir.vars[i], "=", obucket)
+    }
+    
     for (i in 1:length(ofn.vars)) {
-        if (is.na(ofn.paths[i]))
+        if (is.na(ofn.paths[i]) || ofn.paths[i] == "NA")
             next
         obucket = path2bucket(path=ofn.paths[i], out.bucket=out.bucket, base.mount=base.mount)
         dsub.command  = paste0(dsub.command,
                                " --output ", ofn.vars[i], "=", obucket)
     }
     for (i in 1:length(odir.vars)) {
-        if (is.na(odir.paths[i]))
+        if (is.na(odir.paths[i]) || odir.paths[i] == "NA")
             next
         obucket = path2bucket(path=odir.paths[i], out.bucket=out.bucket, base.mount=base.mount)
         dsub.command  = paste0(dsub.command,
                                " --output-recursive ", odir.vars[i], "=", obucket)
     }
+    dsub.command  = paste0(dsub.command,
+                           " --output-recursive ", odir.var, "=", out.path)
+
+    dsub.command  = paste0(dsub.command,
+                           " --input-recursive ", paste0("MAKESHIFT_ROOT=", ms.root))
+    
     dsub.run(command=dsub.command, dry=dry, wait=wait, 
              project=project, provider=provider,
              job.keys=job.keys, ms.level=ms.level,
              project.name=project.name, max.report.level=max.report.level, job.id=job.id,
              ms.title=name, ms.type="direct", ms.desc=command, logging=dbase$logging, email=email,
-             send.email.flag=send.email.flag, sendgrid.key=sendgrid.key, out.paths=out.dir)
+             send.email.flag=send.email.flag, sendgrid.key=sendgrid.key, out.paths=out.path)
 }

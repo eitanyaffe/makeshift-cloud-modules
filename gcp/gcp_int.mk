@@ -203,6 +203,11 @@ GCP_DSUB_DIRECT_LOGDIR?=log_path
 # list of variable names of input files
 GCP_DSUB_DIRECT_IFN_VARS?=i_vars
 
+# list of variable names of input dirs
+GCP_DSUB_DIRECT_IDIR_VARS?=NA
+GCP_DSUB_DIRECT_IDIR_BUCKETS?=NA
+GCP_DSUB_DIRECT_IDIR_BASEDIRS?=NA
+
 # list of input files
 GCP_DSUB_DIRECT_IFNS?=ifns
 
@@ -217,6 +222,9 @@ GCP_DSUB_DIRECT_OFNS?=ofns
 
 # command to execute
 GCP_DSUB_DIRECT_COMMAND?=command
+
+# typically save job stats but some images don't have nproc or getconf
+DSUB_SAVE_JOB_STATS?=$(PAR_SAVE_JOB_STATS)
 
 ###############################################################################################
 # remove files and dirs

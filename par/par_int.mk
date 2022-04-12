@@ -79,7 +79,7 @@ PAR_CPU_COUNT?=2
 PAR_RAM_GB?=8
 
 # boot disk
-PAR_BOOT_GB?=10
+PAR_BOOT_GB?=12
 
 # data disk pd-ssd / pd-standard
 PAR_DISK_TYPE?=pd-standard
@@ -141,6 +141,11 @@ PAR_DIRECT_LOGDIR?=log_path
 # list of variable names of input files
 PAR_DIRECT_IFN_VARS?=i_vars
 
+# list of variable names of input dirs
+PAR_DIRECT_IDIR_VARS?=NA
+PAR_DIRECT_IDIR_BUCKETS?=NA
+PAR_DIRECT_IDIR_BASEDIRS?=NA
+
 # list of input files
 PAR_DIRECT_IFNS?=ifns
 
@@ -155,6 +160,9 @@ PAR_DIRECT_OFNS?=ofns
 
 # command to execute
 PAR_DIRECT_COMMAND?=command
+
+# typically save job stats but some images don't have nproc or getconf
+PAR_SAVE_JOB_STATS?=T
 
 ###############################################################################################
 # notify to email
