@@ -72,7 +72,11 @@ MS_LEVEL?=1
 
 # style can be custom or defined
 PAR_SPEC_STYLE?=defined
-PAR_MACHINE?=n1-standard-1
+
+# default is the cheapest machine todate
+PAR_MACHINE?=e2-small
+#PAR_MACHINE?=e2-micro
+#PAR_MACHINE?=n1-standard-1
 
 # spec relevant for custom only
 PAR_CPU_COUNT?=2

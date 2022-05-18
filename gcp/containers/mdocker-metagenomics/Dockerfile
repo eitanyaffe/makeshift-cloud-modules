@@ -231,6 +231,40 @@ ENV PATH="/opt/cd-hit:/opt/cd-hit/cd-hit-auxtools:/opt/cd-hit/psi-cd-hit:/opt/nc
 RUN R -e "install.packages(c('igraph', 'intervals'))"
 
 #############################################################################################
+# G4iMGrinder
+#############################################################################################
+
+RUN R -e "BiocManager::install('pqsfinder')"
+
+#############################################################################################
+# MMSeqs2
+#############################################################################################
+
+RUN cd /usr/local && \
+    wget https://mmseqs.com/latest/mmseqs-linux-avx2.tar.gz && \
+    tar xvfz mmseqs-linux-avx2.tar.gz && \
+    rm -rf mmseqs-linux-avx2.tar.gz
+ENV PATH $PATH:/usr/local/mmseqs/bin
+
+#############################################################################################
+# eggNOG
+#############################################################################################
+
+RUN mkdir /eggNOG && cd /eggNOG && \
+    wget --no-check-certificate https://github.com/eggnogdb/eggnog-mapper/archive/refs/tags/2.1.7.tar.gz && \
+    tar xvfz 2.1.7.tar.gz && \
+    rm -rf 2.1.7.tar.gz && cd eggnog-mapper-2.1.7 && \
+    pip install -r requirements.txt
+
+#############################################################################################
+# eggNOG
+#############################################################################################
+
+RUN wget http://www.clustal.org/omega/clustalo-1.2.4-Ubuntu-x86_64 && \
+    mv clustalo-1.2.4-Ubuntu-x86_64 /usr/local/bin && \
+    chmod a+x /usr/local/bin/clustalo-1.2.4-Ubuntu-x86_64
+
+#############################################################################################
 # default command
 #############################################################################################
 

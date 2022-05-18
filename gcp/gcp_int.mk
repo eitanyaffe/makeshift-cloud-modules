@@ -1,4 +1,6 @@
-units:=gcp_dsub.mk gcp_env.mk gcp_sync.mk gcp_image.mk gcp_buckets.mk gcp_download.mk
+units:=gcp_dsub.mk gcp_env.mk gcp_sync.mk gcp_image.mk gcp_buckets.mk gcp_download.mk \
+gcp_purge.mk
+
 $(call _register_module,gcp,$(units),)
 
 # json key file
