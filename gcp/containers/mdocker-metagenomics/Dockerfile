@@ -265,6 +265,83 @@ RUN wget http://www.clustal.org/omega/clustalo-1.2.4-Ubuntu-x86_64 && \
     chmod a+x /usr/local/bin/clustalo-1.2.4-Ubuntu-x86_64
 
 #############################################################################################
+# StrainFinder
+#############################################################################################
+
+RUN git clone https://github.com/cssmillie/StrainFinder.git /StrainFinder && \
+    sudo apt install -y python2 && \
+    curl https://bootstrap.pypa.io/pip/2.7/get-pip.py --output get-pip.py && \
+    sudo python2 get-pip.py && \
+    sudo apt-get install -y python-dev && \
+    pip2 install numpy scipy && \
+    pip2 install openopt FuncDesigner DerApproximator
+
+#############################################################################################
+# more R packages
+#############################################################################################
+
+RUN R -e "BiocManager::install(c('dendextend', 'phangorn', 'phylogram'))"
+
+#############################################################################################
+# Pandas
+#############################################################################################
+
+RUN pip install pandas
+
+#############################################################################################
+# HMMER, PYTHON3, FASTTREE, MASH
+#############################################################################################
+
+RUN apt-get update -y -m && \
+    DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends --no-install-suggests -y \
+        wget \
+        hmmer=3.* \
+        mash=2.2.* \
+        prodigal=1:2.6.* \
+        fasttree=2.1.* \
+        unzip && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* && \
+    ln -s /usr/bin/fasttreeMP /usr/bin/FastTreeMP
+
+#############################################################################################
+# PPLACER
+#############################################################################################
+
+RUN wget https://github.com/matsen/pplacer/releases/download/v1.1.alpha19/pplacer-linux-v1.1.alpha19.zip -q && \
+    unzip pplacer-linux-v1.1.alpha19.zip && \
+    mv pplacer-Linux-v1.1.alpha19/* /usr/bin && \
+    rm pplacer-linux-v1.1.alpha19.zip && \
+    rm -rf pplacer-Linux-v1.1.alpha19
+
+#############################################################################################
+# FASTANI
+#############################################################################################
+
+RUN wget https://github.com/ParBLiSS/FastANI/releases/download/v1.33/fastANI-Linux64-v1.33.zip -q && \
+    unzip fastANI-Linux64-v1.33.zip -d /usr/bin && \
+    rm fastANI-Linux64-v1.33.zip
+
+#############################################################################################
+# GTDB-TK
+#############################################################################################
+
+RUN pip3 install gtdbtk
+
+#############################################################################################
+# CHECKM
+#############################################################################################
+
+RUN pip3 install numpy matplotlib pysam checkm-genome
+
+#############################################################################################
+# Domcycle
+#############################################################################################
+
+RUN git clone https://github.com/nshalon/DomCycle.git /DomCycle
+RUN pip3 install -r /DomCycle/requirements.txt
+
+#############################################################################################
 # default command
 #############################################################################################
 

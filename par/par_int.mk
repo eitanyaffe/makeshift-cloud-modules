@@ -20,7 +20,7 @@ PAR_MODULE?=libs
 # name of job
 PAR_NAME?=job_name
 
-# for billing purposes
+# useful to track spendings in Google Console 
 PAR_MS_PROJECT_NAME?=specify_project_name
 
 # parent directory, where we save the job labels and task file
@@ -33,6 +33,11 @@ PAR_ODIR_VAR?=specify_outdir_variable_name
 PAR_ODIR_BUCKET?=specify_output_bucket
 
 PAR_ODIR_BUCKET_BASE?=$(OUTPUT_DIR)
+
+# these directories are downloaded (and not mounted)
+PAR_IDIR_VARS?=NA
+PAR_IDIR_BUCKETS?=$(GCP_DSUB_ODIR_BUCKET)
+PAR_IDIR_BASEDIRS?=$(PAR_ODIR_BUCKET_BASE)
 
 # make target to call
 PAR_TARGET?=make_target
@@ -143,15 +148,10 @@ PAR_JOB_ID?=$(PAR_NAME)_$(PAR_DATE)_$(PAR_USER)$(if $(DDESC),_$(DDESC))
 PAR_DIRECT_LOGDIR?=log_path
 
 # list of variable names of input files
-PAR_DIRECT_IFN_VARS?=i_vars
-
-# list of variable names of input dirs
-PAR_DIRECT_IDIR_VARS?=NA
-PAR_DIRECT_IDIR_BUCKETS?=NA
-PAR_DIRECT_IDIR_BASEDIRS?=NA
+PAR_DIRECT_IFN_VARS?=NA
 
 # list of input files
-PAR_DIRECT_IFNS?=ifns
+PAR_DIRECT_IFNS?=NA
 
 # list of variable names of output files
 PAR_DIRECT_OFN_VARS?=NA

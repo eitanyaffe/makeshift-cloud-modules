@@ -465,6 +465,10 @@ dsub.ms=function(job.work.dir,
                  credentials.file=NULL,
                  mount.buckets,
                  mount.bucket.vars,
+                 idir.vars,
+                 idir.paths,
+                 idir.buckets,
+                 idir.basedirs,
                  dry,
                  wait,
                  log.interval,
@@ -545,6 +549,15 @@ dsub.ms=function(job.work.dir,
                     "--input-recursive", paste0("MAKESHIFT_ROOT=", ms.root),
                     "--input-recursive", paste0("MAKESHIFT_CONFIG=", ms.cfg))
 
+    # input dirs
+    for (i in 1:length(idir.vars)) {
+        if (is.na(idir.vars[i]) || idir.vars[i] == "NA")
+            next
+        obucket = path2bucket(path=idir.paths[i], out.bucket=idir.buckets[i], base.mount=idir.basedirs[i])
+        command  = paste0(command,
+                          " --input-recursive ", idir.vars[i], "=", obucket)
+    }
+    
     if (upload.intermediates)
         command = paste(command,
                     paste0("--env GCP_RSYNC_SRC_VAR=", out.var),
@@ -614,6 +627,10 @@ dsub.ms.tasks=function(job.work.dir,
                        credentials.file=NULL,
                        mount.buckets,
                        mount.bucket.vars,
+                       idir.vars,
+                       idir.paths,
+                       idir.buckets,
+                       idir.basedirs,
                        task.odir.var,
                        task.odir.vals,
                        task.item.var,
@@ -750,6 +767,16 @@ dsub.ms.tasks=function(job.work.dir,
                     "--input-recursive", paste0("MAKESHIFT_CONFIG=", ms.cfg),
                     "--command", ds,
                     "--tasks", tfile)
+
+    # input dirs
+    for (i in 1:length(idir.vars)) {
+        if (is.na(idir.vars[i]) || idir.vars[i] == "NA")
+            next
+        obucket = path2bucket(path=idir.paths[i], out.bucket=idir.buckets[i], base.mount=idir.basedirs[i])
+        command  = paste0(command,
+                          " --input-recursive ", idir.vars[i], "=", obucket)
+    }
+    
     for (i in 1:length(mount.buckets))
         command  = paste0(command,
                           " --mount ", mount.bucket.vars[i], "=", mount.buckets[i])
@@ -811,6 +838,10 @@ dsub.ms.complex=function(job.work.dir,
                          credentials.file=NULL,
                          mount.buckets,
                          mount.bucket.vars,
+                         idir.vars,
+                         idir.paths,
+                         idir.buckets,
+                         idir.basedirs,
                          df.tasks,
                          task.item.var,
                          task.odir.var,
@@ -948,6 +979,16 @@ dsub.ms.complex=function(job.work.dir,
                     "--input-recursive", paste0("MAKESHIFT_CONFIG=", ms.cfg),
                     "--command", ds,
                     "--tasks", tfile)
+
+    # input dirs
+    for (i in 1:length(idir.vars)) {
+        if (is.na(idir.vars[i]) || idir.vars[i] == "NA")
+            next
+        obucket = path2bucket(path=idir.paths[i], out.bucket=idir.buckets[i], base.mount=idir.basedirs[i])
+        command  = paste0(command,
+                          " --input-recursive ", idir.vars[i], "=", obucket)
+    }
+    
     for (i in 1:length(mount.buckets))
         command  = paste0(command,
                           " --mount ", mount.bucket.vars[i], "=", mount.buckets[i])
@@ -1074,10 +1115,12 @@ dsub.direct=function(job.work.dir,
     }
     
     # input files
-    for (i in 1:length(ifn.vars)) {
-        obucket = path2bucket(path=ifn.paths[i], out.bucket=out.bucket, base.mount=base.mount)
-        dsub.command  = paste0(dsub.command,
-                               " --input ", ifn.vars[i], "=", obucket)
+    if (ifn.vars != "NA") {
+        for (i in 1:length(ifn.vars)) {
+            obucket = path2bucket(path=ifn.paths[i], out.bucket=out.bucket, base.mount=base.mount)
+            dsub.command  = paste0(dsub.command,
+                                   " --input ", ifn.vars[i], "=", obucket)
+        }
     }
 
     # input dirs

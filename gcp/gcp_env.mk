@@ -9,6 +9,7 @@ validate_env:
 
 # run image locally with X11
 denv: validate_env
+	echo "# if getting kill 9 run 'xattr -d com.apple.quarantine /usr/local/bin/docker'"
 	docker run --rm -it --privileged \
 	       -v /tmp/.X11-unix:/tmp/.X11-unix \
 	       -e DISPLAY=host.docker.internal:0 \
@@ -28,7 +29,7 @@ denv: validate_env
 	       -v /var/run/docker.sock:/var/run/docker.sock \
 	       -w /makeshift/$(GCP_PIPELINE_RELATIVE_DIR) \
 	       $(GCP_GCR_IMAGE_PATH) \
-		bash -c "echo \"export PS1='[[$(PAR_MS_PROJECT_NAME)]] \w % '\" >> ~/.bashrc && make m=gcp mount_buckets && bash"
+	       bash -c "echo \"export PS1='[[$(PAR_MS_PROJECT_NAME)]] \w % '\" >> ~/.bashrc && make m=gcp mount_buckets && bash"
 
 # run in VM
 venv:

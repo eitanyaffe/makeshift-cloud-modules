@@ -46,6 +46,10 @@ dsub:
 	       credentials.file=$(GCP_KEY_FILE) \
 	       mount.buckets=$(GCP_MOUNT_BUCKETS) \
 	       mount.bucket.vars=$(GCP_MOUNT_VARS) \
+	       idir.vars="$(GCP_DSUB_IDIR_VARS)" \
+	       idir.paths="$(foreach X,$(GCP_DSUB_IDIR_VARS),$($X))" \
+	       idir.buckets="$(GCP_DSUB_IDIR_BUCKETS)" \
+	       idir.basedirs="$(GCP_DSUB_IDIR_BASEDIRS)" \
 	       preemtible.count=$(GCP_DSUB_PREEMTIBLE) \
 	       non.preemtible.retry.count=$(PAR_NON_PREEMTIBLE_RETRIES) \
 	       log.interval=$(GCP_DSUB_LOG_INTERVAL) \
@@ -90,6 +94,10 @@ dsub_tasks:
 	       credentials.file=$(GCP_KEY_FILE) \
 	       mount.buckets=$(GCP_MOUNT_BUCKETS) \
 	       mount.bucket.vars=$(GCP_MOUNT_VARS) \
+	       idir.vars="$(GCP_DSUB_IDIR_VARS)" \
+	       idir.paths="$(foreach X,$(GCP_DSUB_IDIR_VARS),$($X))" \
+	       idir.buckets="$(GCP_DSUB_IDIR_BUCKETS)" \
+	       idir.basedirs="$(GCP_DSUB_IDIR_BASEDIRS)" \
 	       task.odir.var=$(GCP_DSUB_TASK_ODIR_VAR) \
 	       task.odir.vals=$(DSUB_TASK_ITEM_ODIR) \
 	       task.item.var=$(GCP_DSUB_TASK_ITEM_VAR) \
@@ -139,6 +147,10 @@ dsub_tasks_complex:
 	       credentials.file=$(GCP_KEY_FILE) \
 	       mount.buckets=$(GCP_MOUNT_BUCKETS) \
 	       mount.bucket.vars=$(GCP_MOUNT_VARS) \
+	       idir.vars="$(GCP_DSUB_IDIR_VARS)" \
+	       idir.paths="$(foreach X,$(GCP_DSUB_IDIR_VARS),$($X))" \
+	       idir.buckets="$(GCP_DSUB_IDIR_BUCKETS)" \
+	       idir.basedirs="$(GCP_DSUB_IDIR_BASEDIRS)" \
 	       task.input.table=$(GCP_DSUB_TASK_ITEM_TABLE) \
 	       task.item.var=$(GCP_DSUB_TASK_ITEM_VAR) \
 	       task.odir.var=$(GCP_DSUB_TASK_ODIR_VAR) \
@@ -191,10 +203,10 @@ dsub_direct:
 	       command='$(GCP_DSUB_DIRECT_COMMAND)' \
 	       ifn.vars="$(GCP_DSUB_DIRECT_IFN_VARS)" \
 	       ifn.paths="$(foreach X,$(GCP_DSUB_DIRECT_IFN_VARS),$($X))" \
-	       idir.vars="$(GCP_DSUB_DIRECT_IDIR_VARS)" \
-	       idir.paths="$(foreach X,$(GCP_DSUB_DIRECT_IDIR_VARS),$($X))" \
-	       idir.buckets="$(GCP_DSUB_DIRECT_IDIR_BUCKETS)" \
-	       idir.basedirs="$(GCP_DSUB_DIRECT_IDIR_BASEDIRS)" \
+	       idir.vars="$(GCP_DSUB_IDIR_VARS)" \
+	       idir.paths="$(foreach X,$(GCP_DSUB_IDIR_VARS),$($X))" \
+	       idir.buckets="$(GCP_DSUB_IDIR_BUCKETS)" \
+	       idir.basedirs="$(GCP_DSUB_IDIR_BASEDIRS)" \
 	       ofn.vars="$(GCP_DSUB_DIRECT_OFN_VARS)" \
 	       ofn.paths="$(foreach X,$(GCP_DSUB_DIRECT_OFN_VARS),$($X))" \
 	       odir.vars="$(GCP_DSUB_DIRECT_ODIR_VARS)" \
