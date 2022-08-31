@@ -7,9 +7,10 @@ validate_env:
 	@echo MAKESHIFT_GCP_PROJECT_ID=$(MAKESHIFT_GCP_PROJECT_ID)
 	@echo "====================================================================================="
 
+# to remove docker from quarantine on macos run 'xattr -d com.apple.quarantine /usr/local/bin/docker'
+
 # run image locally with X11
 denv: validate_env
-	echo "# if getting kill 9 run 'xattr -d com.apple.quarantine /usr/local/bin/docker'"
 	docker run --rm -it --privileged \
 	       -v /tmp/.X11-unix:/tmp/.X11-unix \
 	       -e DISPLAY=host.docker.internal:0 \

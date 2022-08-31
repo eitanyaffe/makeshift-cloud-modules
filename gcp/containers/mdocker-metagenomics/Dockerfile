@@ -74,9 +74,7 @@ RUN DEBIAN_FRONTEND="noninteractive" TZ="America/Los_Angeles" \
     apt-get install --no-install-recommends -y \
     dirmngr gnupg2 apt-transport-https ca-certificates software-properties-common \
     && apt-get clean all
-RUN apt-key adv --keyserver keyserver.ubuntu.com --recv-keys E298A3A825C0D65DFD57CBB651716619E084DAB9
-RUN add-apt-repository 'deb https://cloud.r-project.org/bin/linux/ubuntu focal-cran40/'
-
+RUN apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys E298A3A825C0D65DFD57CBB651716619E084DAB9
 RUN apt-get install --no-install-recommends -y r-base && apt-get clean all
 
 #############################################################################################
@@ -173,7 +171,7 @@ RUN R -e "install.packages(c('gplots'))"
 
 RUN mkdir -p /usr/local/diamond && \
     cd /usr/local/diamond && \
-    wget http://github.com/bbuchfink/diamond/releases/download/v2.0.13/diamond-linux64.tar.gz && \
+    wget https://github.com/bbuchfink/diamond/releases/download/v2.0.15/diamond-linux64.tar.gz && \
     tar xvf diamond-linux64.tar.gz && rm -rf diamond-linux64.tar.gz && cp diamond /usr/local/bin
 
 #############################################################################################
@@ -340,6 +338,12 @@ RUN pip3 install numpy matplotlib pysam checkm-genome
 
 RUN git clone https://github.com/nshalon/DomCycle.git /DomCycle
 RUN pip3 install -r /DomCycle/requirements.txt
+
+#############################################################################################
+# gplots again
+#############################################################################################
+
+RUN R -e "install.packages(c('gplots'))"
 
 #############################################################################################
 # default command
