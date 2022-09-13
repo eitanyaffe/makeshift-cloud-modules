@@ -1,10 +1,10 @@
 validate_env:
-	$(call _assert,MAKESHIFT_ROOT MAKESHIFT_CONFIG MAKESHIFT_GCP_PROJECT_ID)
+	$(call _assert,MAKESHIFT_ROOT MAKESHIFT_CONFIG GCP_PROJECT_ID)
 	@echo "====================================================================================="
 	@echo "MakeShift environment variables:"
 	@echo MAKESHIFT_ROOT=$(MAKESHIFT_ROOT)
 	@echo MAKESHIFT_CONFIG=$(MAKESHIFT_CONFIG)
-	@echo MAKESHIFT_GCP_PROJECT_ID=$(MAKESHIFT_GCP_PROJECT_ID)
+	@echo GCP_PROJECT_ID=$(GCP_PROJECT_ID)
 	@echo "====================================================================================="
 
 # to remove docker from quarantine on macos run 'xattr -d com.apple.quarantine /usr/local/bin/docker'
@@ -15,9 +15,10 @@ denv: validate_env
 	       -v /tmp/.X11-unix:/tmp/.X11-unix \
 	       -e DISPLAY=host.docker.internal:0 \
 	       -e MAKESHIFT_ROOT=/makeshift \
+	       -e MAKESHIFT_LOCAL_PATH=$(MAKESHIFT_ROOT) \
 	       -v $(MAKESHIFT_ROOT):/makeshift \
 	       -e MAKESHIFT_CONFIG=/makeshift-config \
-	       -e MAKESHIFT_GCP_PROJECT_ID=$(MAKESHIFT_GCP_PROJECT_ID) \
+	       -e GCP_PROJECT_ID=$(GCP_PROJECT_ID) \
 	       -v $(MAKESHIFT_CONFIG):/makeshift-config \
 	       -v $(dir $(MAKESHIFT_GCP_KEY)):/keys \
 	       -e GOOGLE_APPLICATION_CREDENTIALS=/keys/$(notdir $(MAKESHIFT_GCP_KEY)) \
@@ -30,7 +31,7 @@ denv: validate_env
 	       -v /var/run/docker.sock:/var/run/docker.sock \
 	       -w /makeshift/$(GCP_PIPELINE_RELATIVE_DIR) \
 	       $(GCP_GCR_IMAGE_PATH) \
-	       bash -c "echo \"export PS1='[[$(PAR_MS_PROJECT_NAME)]] \w % '\" >> ~/.bashrc && make m=gcp mount_buckets && bash"
+	       bash -c "echo \"export PS1='[[$(PROJECT_NAME)]] \w % '\" >> ~/.bashrc && make m=gcp mount_buckets bucket_summary && bash"
 
 # run in VM
 venv:

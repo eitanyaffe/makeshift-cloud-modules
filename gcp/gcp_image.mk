@@ -1,7 +1,9 @@
 
 # build image
 mdocker:
-	docker build -t $(GCP_IMAGE_NAME) \
+	docker build \
+		-t $(GCP_IMAGE_NAME) \
+		-f $(_md)/containers/$(GCP_IMAGE_NAME)/Dockerfile \
 		$(_md)/containers/$(GCP_IMAGE_NAME)
 	docker tag $(GCP_IMAGE_NAME) $(GCP_GCR_IMAGE_PATH)
 

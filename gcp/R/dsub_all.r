@@ -354,13 +354,35 @@ verify.final.file=function(out.paths, job.key)
     rc
 }
 
-dsub.run=function(command, dry, wait, project, provider, job.keys, ms.level, job.id,
+dsub.run=function(command, dry, wait, project, provider, job.keys, ms.level, log.basedir, job.id, 
                   project.name, ms.type, ms.title, ms.desc, logging, email, max.report.level,
                   send.email.flag, sendgrid.key, out.paths)
 {
     cat(paste0(">>> DSUB: running dsub command: \n", gsub("--", '\\\\\n\t--', command), "\n"))
     if (dry) stop("dry run")
-
+    
+    if (ms.level == 1) {
+        cat(paste0("======================================================================================\n"))
+        cat(sprintf(">>> Makeshift job instructions: \n"))
+        log.dir = paste0(log.basedir, "/runs/", job.keys[1])
+        system(paste("mkdir -p", log.dir))
+        log.fn = paste0(log.dir, "/run.info")
+        write.table(x=logging, file=log.fn, quote=F, row.names=F, col.names=F)
+        if (!wait)
+            cat(sprintf("To delete job:\n%%> make p_del_job RUN_KEY=%s\n", job.keys[1]))
+        else {
+            cat(sprintf("Hitting Ctrl-C will terminate the entire job\n"))
+            cat(sprintf("To make sure job is deleted run:\n%%> make p_del_job RUN_KEY=%s\n", job.keys[1]))
+        }
+        cat(sprintf("To download job logs run (wait until job terminates for complete logs):\n"))
+        cat(sprintf("%%> make p_download_logs RUN_KEY=%s\n", job.keys[1]))
+        cat(sprintf("To see status of all jobs:\n"))
+        cat(sprintf("%%> make dstat\n"))
+        cat(sprintf("To see summary status of all jobs run:\n"))
+        cat(sprintf("%%> make dstat_s\n"))
+        cat(paste0("======================================================================================\n"))
+    }
+    
     job.rc = system(command)
     cat(sprintf("dsub call return code: %d\n", job.rc))
 
@@ -426,9 +448,13 @@ dsub.run=function(command, dry, wait, project, provider, job.keys, ms.level, job
         stop("dsub error")
     
     if (wait) {
-        cat(sprintf(">>> DSUB job ended successfully\n"))
+        cat(sprintf(">>> DSUB: job ended successfully\n"))
     } else {
-        cat(sprintf(">>> DSUB job submitted successfully\n"))
+        cat(sprintf(">>> DSUB: job launched successfully\n"))
+        if (send.email.flag && email != "NONE" && sendgrid.key != "NONE") {
+            cat(sprintf(">>> DSUB: status emails will be sent to %s\n", email))
+        }
+        cat(sprintf(">>> DSUB: job key: %s\n", job.keys[1]))
     }
 }
 
@@ -471,6 +497,7 @@ dsub.ms=function(job.work.dir,
                  idir.basedirs,
                  dry,
                  wait,
+                 log.basedir,
                  log.interval,
                  drop.params,
                  batch.index,
@@ -572,7 +599,7 @@ dsub.ms=function(job.work.dir,
     
     dsub.run(command=command, dry=dry, wait=wait, 
              project=project, provider=provider,
-             job.keys=job.keys, ms.level=ms.level,
+             job.keys=job.keys, ms.level=ms.level, log.basedir=log.basedir,
              project.name=project.name, max.report.level=max.report.level, job.id=job.id,
              ms.title=name, ms.type="single", ms.desc=make.base, logging=dbase$logging, email=email,
              send.email.flag=send.email.flag, sendgrid.key=sendgrid.key, out.paths=out.path)
@@ -637,6 +664,7 @@ dsub.ms.tasks=function(job.work.dir,
                        task.item.vals,
                        dry,
                        wait,
+                       log.basedir,
                        log.interval,
                        drop.params,
                        ms.level,
@@ -783,7 +811,7 @@ dsub.ms.tasks=function(job.work.dir,
 
     dsub.run(command=command, dry=dry, wait=wait,
              project=project, provider=provider,
-             job.keys=job.keys, ms.level=ms.level,
+             job.keys=job.keys, ms.level=ms.level, log.basedir=log.basedir,
              project.name=project.name, max.report.level=max.report.level, job.id=job.id,
              ms.title=name, ms.type="tasks_simple", ms.desc=make.base, logging=dbase$logging, email=email,
              send.email.flag=send.email.flag, sendgrid.key=sendgrid.key, out.paths=out.paths)
@@ -848,6 +876,7 @@ dsub.ms.complex=function(job.work.dir,
                          task.odir.vals,
                          dry,
                          wait,
+                         log.basedir,
                          log.interval,
                          drop.params,
                          ms.level,
@@ -995,7 +1024,7 @@ dsub.ms.complex=function(job.work.dir,
 
     dsub.run(command=command, dry=dry, wait=wait,
              project=project, provider=provider,
-             job.keys=job.keys, ms.level=ms.level,
+             job.keys=job.keys, ms.level=ms.level, log.basedir=log.basedir,
              project.name=project.name, max.report.level=max.report.level, job.id=job.id,
              ms.title=name, ms.type="tasks_complex", ms.desc=make.base, logging=dbase$logging, email=email,
              send.email.flag=send.email.flag, sendgrid.key=sendgrid.key, out.paths=out.paths)
@@ -1042,6 +1071,7 @@ dsub.direct=function(job.work.dir,
                      command,
                      dry,
                      wait,
+                     log.basedir,
                      log.interval,
                      params,
                      ms.level,
@@ -1115,7 +1145,7 @@ dsub.direct=function(job.work.dir,
     }
     
     # input files
-    if (ifn.vars != "NA") {
+    if (all(ifn.vars != "NA")) {
         for (i in 1:length(ifn.vars)) {
             obucket = path2bucket(path=ifn.paths[i], out.bucket=out.bucket, base.mount=base.mount)
             dsub.command  = paste0(dsub.command,
@@ -1154,7 +1184,7 @@ dsub.direct=function(job.work.dir,
     
     dsub.run(command=dsub.command, dry=dry, wait=wait, 
              project=project, provider=provider,
-             job.keys=job.keys, ms.level=ms.level,
+             job.keys=job.keys, ms.level=ms.level, log.basedir=log.basedir,
              project.name=project.name, max.report.level=max.report.level, job.id=job.id,
              ms.title=name, ms.type="direct", ms.desc=command, logging=dbase$logging, email=email,
              send.email.flag=send.email.flag, sendgrid.key=sendgrid.key, out.paths=out.path)

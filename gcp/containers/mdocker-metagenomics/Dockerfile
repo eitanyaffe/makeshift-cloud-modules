@@ -5,8 +5,10 @@ FROM ubuntu:20.04
 # basics
 #############################################################################################
 
-RUN DEBIAN_FRONTEND="noninteractive" TZ="America/Los_Angeles" \
-    apt-get update && apt-get install --no-install-recommends -y \
+ENV DEBIAN_FRONTEND="noninteractive"
+ENV TZ="America/Los_Angeles"
+
+RUN apt-get update && apt-get install --no-install-recommends -y \
     git \
     lsb-release \
     curl \
@@ -25,7 +27,24 @@ RUN DEBIAN_FRONTEND="noninteractive" TZ="America/Los_Angeles" \
     bc \
     x11-apps \
     less \
+    libcurl4-gnutls-dev \
     && apt-get clean all
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    liblapack-dev \
+    liblapack3 \
+    libopenblas-base \
+    libopenblas-dev \
+    locate \
+    libboost-all-dev \
+    lbzip2 \
+    valgrind \
+    libswitch-perl \
+    cpanminus \
+    && apt-get clean all
+
+# make python3 the default
+RUN ln -s /usr/bin/python3 /usr/bin/python
 
 #############################################################################################
 # install docker
@@ -58,26 +77,6 @@ RUN apt-get update && apt-get install --no-install-recommends -y gcsfuse && apt-
 RUN pip3 install dsub
 
 #############################################################################################
-# copy local scripts
-#############################################################################################
-
-COPY mm mml /usr/local/bin
-RUN chmod +x /usr/local/bin/mm /usr/local/bin/mml
-
-#############################################################################################
-# g++, gnumake, R
-#############################################################################################
-
-RUN apt-get install --no-install-recommends -y build-essential libgsl0-dev && \
-    apt-get clean all
-RUN DEBIAN_FRONTEND="noninteractive" TZ="America/Los_Angeles" \
-    apt-get install --no-install-recommends -y \
-    dirmngr gnupg2 apt-transport-https ca-certificates software-properties-common \
-    && apt-get clean all
-RUN apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys E298A3A825C0D65DFD57CBB651716619E084DAB9
-RUN apt-get install --no-install-recommends -y r-base && apt-get clean all
-
-#############################################################################################
 # gsutil
 #############################################################################################
 
@@ -92,10 +91,48 @@ RUN curl https://dl.google.com/dl/cloudsdk/release/google-cloud-sdk.tar.gz > \
 # Adding the package path to local
 ENV PATH $PATH:/usr/local/gcloud/google-cloud-sdk/bin
 
-RUN sudo apt-get -y install gcc python3-dev python3-setuptools --no-install-recommends && \
-    sudo pip3 uninstall crcmod && \
-    sudo pip3 install --no-cache-dir -U crcmod && \
-    sudo apt-get clean all
+RUN apt-get update && \
+    apt-get -y install gcc python3-dev python3-setuptools --no-install-recommends && \
+    pip3 uninstall crcmod && \
+    pip3 install --no-cache-dir -U crcmod && \
+    apt-get clean all
+
+#############################################################################################
+# g++, gnumake
+#############################################################################################
+
+RUN apt-get install --no-install-recommends -y build-essential libgsl0-dev && \
+    apt-get clean all
+
+#############################################################################################
+# R
+#############################################################################################
+
+RUN echo "deb https://cloud.r-project.org/bin/linux/ubuntu focal-cran40/" >> /etc/apt/sources.list
+RUN apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys E298A3A825C0D65DFD57CBB651716619E084DAB9
+RUN apt-get update \
+    && apt-get install --no-install-recommends -y r-base r-base-dev \
+    && apt-get clean all
+
+#############################################################################################
+# R packages
+#############################################################################################
+
+# basic packages
+RUN R -e "install.packages(c('igraph', 'intervals', 'gplots', 'BiocManager'))"
+RUN R -e "install.packages('seqinr', dependencies=TRUE, repos='http://cran.rstudio.com/')"
+
+# visualization
+RUN R -e "install.packages(c('umap', 'Rtsne'))"
+
+# Biostrings
+RUN R -e "BiocManager::install('Biostrings', ask=F)"
+
+# for strain analysis
+RUN R -e "BiocManager::install(c('dendextend', 'phangorn', 'phylogram'))"
+
+# for G4iMGrinder
+RUN R -e "BiocManager::install('pqsfinder')"
 
 #############################################################################################
 # megahit
@@ -111,44 +148,21 @@ ENV MEGAHIT_BIN /usr/local/megahit/MEGAHIT-1.2.9-Linux-x86_64-static/bin/megahit
 # prodigal
 #############################################################################################
 
-RUN sudo apt-get install --no-install-recommends prodigal && \
-    sudo apt-get clean all
+RUN apt-get install --no-install-recommends prodigal && \
+    apt-get clean all
 
 #############################################################################################
-# mapping
+# samotools
 #############################################################################################
 
-RUN sudo apt-get install --no-install-recommends -y bwa samtools && \
-    sudo apt-get clean all
+RUN apt-get install --no-install-recommends -y bwa samtools && \
+    apt-get clean all
 
 #############################################################################################
 # sendgrid / khmer / sourmash
 #############################################################################################
 
 RUN pip3 install sendgrid khmer sourmash
-
-#############################################################################################
-# misc
-#############################################################################################
-
-RUN apt-get install -y liblapack-dev liblapack3 libopenblas-base libopenblas-dev
-RUN apt-get install -y r-base-dev
-RUN R -e "install.packages('seqinr', dependencies=TRUE, repos='http://cran.rstudio.com/')"
-
-RUN apt-get install -y --no-install-recommends locate libboost-all-dev
-
-RUN ln -s /usr/bin/python3 /usr/bin/python
-RUN git clone https://github.com/chrisquince/DESMAN.git /DESMAN
-RUN pip3 install Cython
-RUN cd /DESMAN && ./setup.py install
-
-RUN apt-get install -y lbzip2
-
-RUN R -e "install.packages(c('umap', 'Rtsne'))"
-
-RUN apt-get install -y valgrind
-
-RUN apt-get install -y libswitch-perl
 
 #############################################################################################
 # spades assembler
@@ -158,12 +172,6 @@ RUN mkdir -p /usr/local/spades && \
     cd /usr/local/spades && \
     wget http://cab.spbu.ru/files/release3.15.3/SPAdes-3.15.3-Linux.tar.gz && \
     tar zvxf SPAdes-3.15.3-Linux.tar.gz && rm -rf SPAdes-3.15.3-Linux.tar.gz
-
-#############################################################################################
-# more R packages
-#############################################################################################
-
-RUN R -e "install.packages(c('gplots'))"
 
 #############################################################################################
 # diamond
@@ -179,7 +187,7 @@ RUN mkdir -p /usr/local/diamond && \
 #############################################################################################
 
 ARG SRATOOLS_VERSION=current
-RUN apt-get update && apt-get --quiet install --yes curl uuid-runtime && apt-get clean
+RUN apt-get update && apt-get --quiet install --yes curl uuid-runtime && apt-get clean all
 RUN curl https://ftp-trace.ncbi.nlm.nih.gov/sra/sdk/${SRATOOLS_VERSION}/sratoolkit.${SRATOOLS_VERSION}-centos_linux64-cloud.tar.gz | tar xz -C /
 ENV PATH=/usr/local/ncbi/sra-tools/bin:${PATH}
 RUN mkdir -p /root/.ncbi && \
@@ -192,14 +200,6 @@ RUN mkdir -p /root/.ncbi && \
 #    printf '/LIBS/GUID = "%s"\n' `uuidgen` > /root/.ncbi/user-settings.mkfg && \
 #    printf '/libs/cloud/report_instance_identity = "false"\n' >> /root/.ncbi/user-settings.mkfg && \
 #    printf '/repository/user/main/public/cache-disabled = "true"\n' >> /root/.ncbi/user-settings.mkfg
-
-#############################################################################################
-# BiocManager and Biotstrings
-#############################################################################################
-
-RUN sudo apt-get install libcurl4-gnutls-dev
-RUN R -e "install.packages('BiocManager')"
-RUN R -e "BiocManager::install('Biostrings', ask=F)"
 
 #############################################################################################
 # cdhit
@@ -223,18 +223,6 @@ RUN cd /opt && \
 ENV PATH="/opt/cd-hit:/opt/cd-hit/cd-hit-auxtools:/opt/cd-hit/psi-cd-hit:/opt/ncbi-blast-2.8.1+/bin:${PATH}"
 
 #############################################################################################
-# more R packages
-#############################################################################################
-
-RUN R -e "install.packages(c('igraph', 'intervals'))"
-
-#############################################################################################
-# G4iMGrinder
-#############################################################################################
-
-RUN R -e "BiocManager::install('pqsfinder')"
-
-#############################################################################################
 # MMSeqs2
 #############################################################################################
 
@@ -255,7 +243,7 @@ RUN mkdir /eggNOG && cd /eggNOG && \
     pip install -r requirements.txt
 
 #############################################################################################
-# eggNOG
+# clustal
 #############################################################################################
 
 RUN wget http://www.clustal.org/omega/clustalo-1.2.4-Ubuntu-x86_64 && \
@@ -267,18 +255,12 @@ RUN wget http://www.clustal.org/omega/clustalo-1.2.4-Ubuntu-x86_64 && \
 #############################################################################################
 
 RUN git clone https://github.com/cssmillie/StrainFinder.git /StrainFinder && \
-    sudo apt install -y python2 && \
+    apt install -y python2 && \
     curl https://bootstrap.pypa.io/pip/2.7/get-pip.py --output get-pip.py && \
-    sudo python2 get-pip.py && \
-    sudo apt-get install -y python-dev && \
+    python2 get-pip.py && \
+    apt-get install -y python-dev && apt-get clean all && \
     pip2 install numpy scipy && \
     pip2 install openopt FuncDesigner DerApproximator
-
-#############################################################################################
-# more R packages
-#############################################################################################
-
-RUN R -e "BiocManager::install(c('dendextend', 'phangorn', 'phylogram'))"
 
 #############################################################################################
 # Pandas
@@ -287,47 +269,38 @@ RUN R -e "BiocManager::install(c('dendextend', 'phangorn', 'phylogram'))"
 RUN pip install pandas
 
 #############################################################################################
-# HMMER, PYTHON3, FASTTREE, MASH
+# GTDB-TK
 #############################################################################################
 
+# HMMER, PYTHON3, FASTTREE, MASH
 RUN apt-get update -y -m && \
-    DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends --no-install-suggests -y \
-        wget \
+    apt-get install --no-install-recommends --no-install-suggests -y \
         hmmer=3.* \
         mash=2.2.* \
         prodigal=1:2.6.* \
         fasttree=2.1.* \
         unzip && \
-    apt-get clean && \
+    apt-get clean all && \
     rm -rf /var/lib/apt/lists/* && \
     ln -s /usr/bin/fasttreeMP /usr/bin/FastTreeMP
 
-#############################################################################################
 # PPLACER
-#############################################################################################
-
 RUN wget https://github.com/matsen/pplacer/releases/download/v1.1.alpha19/pplacer-linux-v1.1.alpha19.zip -q && \
     unzip pplacer-linux-v1.1.alpha19.zip && \
     mv pplacer-Linux-v1.1.alpha19/* /usr/bin && \
     rm pplacer-linux-v1.1.alpha19.zip && \
     rm -rf pplacer-Linux-v1.1.alpha19
 
-#############################################################################################
 # FASTANI
-#############################################################################################
-
 RUN wget https://github.com/ParBLiSS/FastANI/releases/download/v1.33/fastANI-Linux64-v1.33.zip -q && \
     unzip fastANI-Linux64-v1.33.zip -d /usr/bin && \
     rm fastANI-Linux64-v1.33.zip
 
-#############################################################################################
 # GTDB-TK
-#############################################################################################
-
 RUN pip3 install gtdbtk
 
 #############################################################################################
-# CHECKM
+# CheckM
 #############################################################################################
 
 RUN pip3 install numpy matplotlib pysam checkm-genome
@@ -336,14 +309,35 @@ RUN pip3 install numpy matplotlib pysam checkm-genome
 # Domcycle
 #############################################################################################
 
+ARG FORCE_REBUILD=unknown
 RUN git clone https://github.com/nshalon/DomCycle.git /DomCycle
 RUN pip3 install -r /DomCycle/requirements.txt
 
 #############################################################################################
-# gplots again
+# XML::Parser for parsing GOA_UNIPROT_TABLE
 #############################################################################################
 
-RUN R -e "install.packages(c('gplots'))"
+RUN cpanm install XML::Parser
+
+#############################################################################################
+# DESMAN
+#############################################################################################
+
+#RUN git clone https://github.com/chrisquince/DESMAN.git /DESMAN
+#RUN pip3 install Cython
+#RUN cd /DESMAN && ./setup.py install
+
+#############################################################################################
+# gcloud
+#############################################################################################
+
+RUN gcloud config set component_manager/disable_update_check true
+
+#############################################################################################
+# aliases
+#############################################################################################
+
+RUN echo 'alias gcat="gsutil cat"' >> ~/.bashrc
 
 #############################################################################################
 # default command

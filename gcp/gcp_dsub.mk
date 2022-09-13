@@ -55,6 +55,7 @@ dsub:
 	       log.interval=$(GCP_DSUB_LOG_INTERVAL) \
 	       dry=$(DRY) \
 	       wait=$(GCP_DSUB_WAIT) \
+	       log.basedir=$(GCP_LOG_BASEDIR) \
 	       drop.params=$(GCP_DSUB_DROP_PARAMS) \
 	       ms.level=$(MS_LEVEL) \
 	       job.id=$(PAR_JOB_ID) \
@@ -107,6 +108,7 @@ dsub_tasks:
 	       non.preemtible.retry.count=$(PAR_NON_PREEMTIBLE_RETRIES) \
 	       dry=$(DRY) \
 	       wait=$(GCP_DSUB_WAIT) \
+	       log.basedir=$(GCP_LOG_BASEDIR) \
 	       log.interval=$(GCP_DSUB_LOG_INTERVAL) \
 	       drop.params=$(GCP_DSUB_DROP_PARAMS) \
 	       ms.level=$(MS_LEVEL) \
@@ -160,6 +162,7 @@ dsub_tasks_complex:
 	       non.preemtible.retry.count=$(PAR_NON_PREEMTIBLE_RETRIES) \
 	       dry=$(DRY) \
 	       wait=$(GCP_DSUB_WAIT) \
+	       log.basedir=$(GCP_LOG_BASEDIR) \
 	       log.interval=$(GCP_DSUB_LOG_INTERVAL) \
 	       drop.params=$(GCP_DSUB_DROP_PARAMS) \
 	       ms.level=$(MS_LEVEL) \
@@ -197,6 +200,7 @@ dsub_direct:
 	       non.preemtible.retry.count=$(PAR_NON_PREEMTIBLE_RETRIES) \
 	       dry=$(DRY) \
 	       wait=$(GCP_DSUB_WAIT) \
+	       log.basedir=$(GCP_LOG_BASEDIR) \
 	       log.interval=$(GCP_DSUB_LOG_INTERVAL) \
 	       odir.var=$(GCP_DSUB_DIRECT_ODIR_VAR) \
 	       out.dir=$($(GCP_DSUB_DIRECT_ODIR_VAR)) \

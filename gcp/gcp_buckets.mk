@@ -37,6 +37,12 @@ destroy_buckets:
 # mount buckets locally
 ###############################################################################################
 
+info_bucket:
+	@echo "$(GCP_MOUNT_BUCKET) on $(GCP_MOUNT_VAR)"
+info_buckets:
+	@echo "bucket mount directories:"
+	@$(MAKE) class_loop class=gmount t=info_bucket --no-print-directory | grep "^gs"
+
 gcp_mount:
 	@gsutil ls $(GCP_MOUNT_BUCKET) > /dev/null 2>&1; if [ $$? -eq 0 ]; then \
 	mkdir -p $(GCP_MOUNT_VAR) && \
@@ -47,20 +53,20 @@ gcp_mount:
 		$(GCP_MOUNT_BUCKET_SHORT) \
 		$(GCP_MOUNT_VAR) \
 	; else \
-	echo "Error mounting $(GCP_MOUNT_BUCKET), skipping" \
+	echo "Bucket $(GCP_MOUNT_BUCKET) does not exist, skipping mount" \
 	; fi
 
 # create and mount
 gcp_create_mount: gcp_mb gcp_mount
 
 mount_bucket:
-	$(MAKE) class_step class=gmount instance=$i t=gcp_mount
+	@$(MAKE) class_step class=gmount instance=$i t=gcp_mount
 
 create_mount_bucket:
-	$(MAKE) class_step class=gmount instance=$i t=gcp_create_mount
+	@$(MAKE) class_step class=gmount instance=$i t=gcp_create_mount
 
 mount_buckets:
-	$(MAKE) class_loop class=gmount t=gcp_mount
+	@$(MAKE) class_loop class=gmount t=gcp_mount
 
 ###############################################################################################
 # mount buckets locally under home, useful to view results

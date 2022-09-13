@@ -1,7 +1,8 @@
 units:=gcp_dsub.mk gcp_env.mk gcp_sync.mk gcp_image.mk gcp_buckets.mk gcp_download.mk \
-gcp_purge.mk
+gcp_purge.mk gcp_logs.mk
 
-$(call _register_module,gcp,$(units),)
+GCP_VER?=v1.00
+$(call _register_module,gcp,GCP_VER,$(units))
 
 # json key file
 GCP_KEY_FILE?=$(if $(GOOGLE_APPLICATION_CREDENTIALS),$(GOOGLE_APPLICATION_CREDENTIALS),$(MAKESHIFT_ROOT)/keys/makeshift.json)
@@ -12,15 +13,15 @@ GCP_PIPELINE_RELATIVE_DIR:=$(subst $(MAKESHIFT_ROOT)/,,$(CURDIR))
 # makeshift bucket
 ###############################################################################################
 
-# makeshift code placed in bucket
-GCP_MAKESHIFT_BUCKET_BASE?=ms-$(PAR_MS_PROJECT_NAME)-code
+# makeshift code
+GCP_MAKESHIFT_BUCKET_BASE?=ms-$(GCP_PROJECT_ID)-$(PIPELINE_NAME)-code
 GCP_MAKESHIFT_BUCKET?=gs://$(GCP_MAKESHIFT_BUCKET_BASE)
 
-# makeshift config files placed in a separate bucket
-GCP_MAKESHIFT_CONFIG_BUCKET_BASE?=ms-$(PAR_MS_PROJECT_NAME)-config
+# project config files
+GCP_MAKESHIFT_CONFIG_BUCKET_BASE?=ms-$(GCP_PROJECT_ID)-$(PROJECT_NAME)-config
 GCP_MAKESHIFT_CONFIG_BUCKET?=gs://$(GCP_MAKESHIFT_CONFIG_BUCKET_BASE)
 
-# compiled programs placed in separate bucket
+# pipeline compiled programs
 BINARY_BUCKET?=gs://ms-$(GCP_PROJECT_ID)-$(PIPELINE_NAME)-bin
 
 # explicitely include all relevant modules
@@ -31,8 +32,6 @@ GCP_MAKESHIFT_EXTRA?=
 ###############################################################################################
 # account details
 ###############################################################################################
-
-GCP_PROJECT_ID?=$(MAKESHIFT_GCP_PROJECT_ID)
 
 # default dsub regions
 GCP_REGION?=us-west1
@@ -152,9 +151,13 @@ GCP_DSUB_WAIT?=T
 # variable name of the output directory
 GCP_DSUB_ODIR_VAR?=specify_outdir_variable_name
 
-# bucket of the output directory
-GCP_DSUB_ODIR_BUCKET?=specify_output_bucket
+# bump up this version to output to new bucket
+OBUCKET_VERSION?=1
 
+# bucket of the output directory
+GCP_DSUB_ODIR_BUCKET?=gs://$(PROJECT_NAME)-$(GCP_PROJECT_ID)-work-$(OBUCKET_VERSION)
+
+# mount base dir
 GCP_DSUB_ODIR_BUCKET_BASE?=$(OUTPUT_DIR)
 
 # must be defined by call
@@ -164,10 +167,10 @@ GCP_DSUB_TARGET?=target
 GCP_DSUB_NAME?=dsub_name
 
 # label of dsub job
-GCP_MS_PROJECT_NAME?=$(PAR_MS_PROJECT_NAME)
+GCP_MS_PROJECT_NAME?=$(PROJECT_NAME)
 
 # mount locally under here
-GCP_LOCAL_MOUNT_PATH?=$(HOME)/$(PAR_MS_PROJECT_NAME)
+GCP_LOCAL_MOUNT_PATH?=$(HOME)/$(PROJECT_NAME)
 
 # these directories are downloaded (and not mounted)
 GCP_DSUB_IDIR_VARS?=NA
@@ -268,4 +271,25 @@ GCP_DOWNLOAD_DISK_GB?=1000
 GCP_DOWNLOAD_ID?=d1
 GCP_DOWNLOAD_ROOT_DIR?=$(OUTPUT_DIR)
 GCP_DOWNLOAD_WORK_DIR?=$(GCP_DOWNLOAD_ROOT_DIR)/download/$(GCP_DOWNLOAD_ID)
+
+###############################################################################################
+# gcp_logs.mk
+###############################################################################################
+
+GCP_LOG_BASEDIR?=$(MAKESHIFT_ROOT)/logs
+
+# identifier of run
+RUN_KEY?=specify_run_key
+
+# keep run files here
+GCP_LOG_RUN_DIR?=$(GCP_LOG_BASEDIR)/runs/$(RUN_KEY)
+
+# file with run details
+GCP_LOG_RUN_FILE?=$(GCP_LOG_RUN_DIR)/run.info
+
+# path to log file
+GCP_LOG_PATH?=specify_log_file
+
+# follow downloads into log
+GCP_LOG_RECURSIVE?=T
 

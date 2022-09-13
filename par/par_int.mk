@@ -1,9 +1,21 @@
 units:=par.mk par_email.mk
-$(call _register_module,par,$(units),)
+PAR_VER?=v1.00
+$(call _register_module,par,PAR_VER,$(units))
 
 ###############################################################################################
 # general job parameters
 ###############################################################################################
+
+# for top jobs
+TOP_DIR?=$(OUTPUT_DIR)/top
+TOP_MANAGER_DIR?=$(TOP_DIR)/manager
+TOP_WORK_DIR?=$(TOP_DIR)/work
+
+# when true cloud jobs are not submitted
+DRY?=F
+
+# T: wait for job, F: submit and finish
+TOP_WAIT?=T
 
 # can be dsub (through gcp) or local
 PAR_TYPE?=dsub
@@ -20,8 +32,8 @@ PAR_MODULE?=libs
 # name of job
 PAR_NAME?=job_name
 
-# useful to track spendings in Google Console 
-PAR_MS_PROJECT_NAME?=specify_project_name
+# project identifier, used to monitor jobs and track spendings
+PROJECT_NAME?=specify_project_name
 
 # parent directory, where we save the job labels and task file
 PAR_WORK_DIR?=specify_work_dir
@@ -190,3 +202,17 @@ PAR_SENDGRID_API_KEY?=$(if $(SENDGRID_API_KEY),$(SENDGRID_API_KEY),NONE)
 
 PAR_EXPORT_LABEL?=default
 BASE_EXPORT_DIR?=$(OUTPUT_DIR)/export/$(PAR_EXPORT_LABEL)
+
+####################################################################################
+# figures
+####################################################################################
+
+# local: plot to local computer, quicker
+# cloud: plot to output bucket, typically slower due to gcsfuse performance
+FIGURE_LOCATION?=local
+
+ifeq ($(FIGURE_LOCATION),local)
+FIGURE_DIR?=/makeshift/figures/$(PIPELINE_NAME)/$(PROJECT_NAME)
+else
+FIGURE_DIR?=$(OUTDIR)/figures
+endif
