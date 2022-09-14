@@ -31,7 +31,7 @@ denv: validate_env
 	       -v /var/run/docker.sock:/var/run/docker.sock \
 	       -w /makeshift/$(GCP_PIPELINE_RELATIVE_DIR) \
 	       $(GCP_GCR_IMAGE_PATH) \
-	       bash -c "echo \"export PS1='[[$(PROJECT_NAME)]] \w % '\" >> ~/.bashrc && make m=gcp mount_buckets bucket_summary && bash"
+	       bash -c "echo \"export PS1='[[$(PIPELINE_NAME):$(PROJECT_NAME)]] \w % '\" >> ~/.bashrc && make m=gcp mount_buckets bucket_summary && bash"
 
 # run in VM
 venv:

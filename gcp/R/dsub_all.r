@@ -364,22 +364,23 @@ dsub.run=function(command, dry, wait, project, provider, job.keys, ms.level, log
     if (ms.level == 1) {
         cat(paste0("======================================================================================\n"))
         cat(sprintf(">>> Makeshift job instructions: \n"))
+        cat(sprintf("The RUN_KEY associated with this run is %s\n", job.keys[1]))
         log.dir = paste0(log.basedir, "/runs/", job.keys[1])
         system(paste("mkdir -p", log.dir))
         log.fn = paste0(log.dir, "/run.info")
         write.table(x=logging, file=log.fn, quote=F, row.names=F, col.names=F)
         if (!wait)
-            cat(sprintf("To delete job:\n%%> make p_del_job RUN_KEY=%s\n", job.keys[1]))
+            cat(sprintf("To delete job:\n%%> make m=gcp ddel X=%s\n", job.keys[1]))
         else {
-            cat(sprintf("Hitting Ctrl-C will terminate the entire job\n"))
-            cat(sprintf("To make sure job is deleted run:\n%%> make p_del_job RUN_KEY=%s\n", job.keys[1]))
+            cat(sprintf("Hitting Ctrl-C will terminate the entire job. "))
+            cat(sprintf("To deleted run from another terminal run:\n%%> make p_del_job RUN_KEY=%s\n", job.keys[1]))
         }
-        cat(sprintf("To download job logs run (wait until job terminates for complete logs):\n"))
-        cat(sprintf("%%> make p_download_logs RUN_KEY=%s\n", job.keys[1]))
+        cat(sprintf("To download job logs run:\n"))
+        cat(sprintf("%%> make m=gcp gcp_logs_download_key RUN_KEY=%s\n", job.keys[1]))
         cat(sprintf("To see status of all jobs:\n"))
-        cat(sprintf("%%> make dstat\n"))
+        cat(sprintf("%%> make m=gcp dstat\n"))
         cat(sprintf("To see summary status of all jobs run:\n"))
-        cat(sprintf("%%> make dstat_s\n"))
+        cat(sprintf("%%> make m=gcp dstat_s\n"))
         cat(paste0("======================================================================================\n"))
     }
     
@@ -454,7 +455,6 @@ dsub.run=function(command, dry, wait, project, provider, job.keys, ms.level, log
         if (send.email.flag && email != "NONE" && sendgrid.key != "NONE") {
             cat(sprintf(">>> DSUB: status emails will be sent to %s\n", email))
         }
-        cat(sprintf(">>> DSUB: job key: %s\n", job.keys[1]))
     }
 }
 
