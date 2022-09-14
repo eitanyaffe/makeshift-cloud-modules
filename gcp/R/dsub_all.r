@@ -364,23 +364,20 @@ dsub.run=function(command, dry, wait, project, provider, job.keys, ms.level, log
     if (ms.level == 1) {
         cat(paste0("======================================================================================\n"))
         cat(sprintf(">>> Makeshift job instructions: \n"))
-        cat(sprintf("The RUN_KEY associated with this run is %s\n", job.keys[1]))
+        cat(sprintf("The <run_key> associated with this run is %s\n", job.keys[1]))
         log.dir = paste0(log.basedir, "/runs/", job.keys[1])
         system(paste("mkdir -p", log.dir))
         log.fn = paste0(log.dir, "/run.info")
         write.table(x=logging, file=log.fn, quote=F, row.names=F, col.names=F)
-        if (!wait)
-            cat(sprintf("To delete job:\n%%> make m=gcp ddel X=%s\n", job.keys[1]))
-        else {
-            cat(sprintf("Hitting Ctrl-C will terminate the entire job. "))
-            cat(sprintf("To deleted run from another terminal run:\n%%> make p_del_job RUN_KEY=%s\n", job.keys[1]))
+        if (wait) {
+            cat(sprintf("Waiting for job to finish. Hit Ctrl-C to terminate the job.\n"))
+            cat(sprintf("Open a new terminal to run the following commands.\n"))
         }
-        cat(sprintf("To download job logs run:\n"))
-        cat(sprintf("%%> make m=gcp gcp_logs_download_key RUN_KEY=%s\n", job.keys[1]))
-        cat(sprintf("To see status of all jobs:\n"))
-        cat(sprintf("%%> make m=gcp dstat\n"))
-        cat(sprintf("To see summary status of all jobs run:\n"))
-        cat(sprintf("%%> make m=gcp dstat_s\n"))
+        cat(sprintf("1. To delete job:\n%% make m=gcp ddel X=%s\n", job.keys[1]))
+        cat(sprintf("2. To download logs (wait until done for complete logs):\n"))
+        cat(sprintf("%% make m=gcp gcp_logs_download_key RUN_KEY=%s\n", job.keys[1]))
+        cat(sprintf("3. To see status of all running jobs:\n"))
+        cat(sprintf("%% make m=gcp dstat_s\n"))
         cat(paste0("======================================================================================\n"))
     }
     
