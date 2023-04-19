@@ -254,6 +254,8 @@ GCP_DU_DEPTH?=2
 # when printing total space
 GCP_DU_TOTAL_UNIT?=TiB
 
+GCP_DU_WORK_DIR?=$(OUTPUT_DIR)/gcp_du
+
 ###############################################################################################
 # download sequence data
 ###############################################################################################
@@ -261,11 +263,14 @@ GCP_DU_TOTAL_UNIT?=TiB
 # url of the a tarball compressed by bz2 data files
 GCP_DOWNLOAD_URL?="specify_download_url"
 
+# multiple URLs
+$(call _class,url,GCP_DOWNLOAD_URL GCP_DOWNLOAD_DESTINATION_BUCKET)
+
 # files will be stored on this bucket
 GCP_DOWNLOAD_DESTINATION_BUCKET?=specify_destination_bucket
 
 GCP_DOWNLOAD_MACHINE?=n2-standard-32
-GCP_DOWNLOAD_DISK_GB?=1000
+GCP_DOWNLOAD_DISK_GB?=1500
 
 # work dir will contain download logs
 GCP_DOWNLOAD_ID?=d1

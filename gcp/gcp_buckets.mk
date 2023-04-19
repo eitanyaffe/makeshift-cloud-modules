@@ -4,8 +4,7 @@
 
 gcp_mb:
 	@gsutil ls $(GCP_MOUNT_BUCKET) > /dev/null 2>&1; if [ $$? -eq 0 ]; then \
-	echo "Bucket $(GCP_MOUNT_BUCKET) already exists, skipping" \
-	; else \
+	: ; else \
 	gsutil mb -p $(GCP_PROJECT_ID) -l $(GCP_LOCATION) -c $(GCP_CLASS) $(GCP_MOUNT_BUCKET) \
 	; fi
 
@@ -43,8 +42,10 @@ info_buckets:
 	@echo "bucket mount directories:"
 	@$(MAKE) class_loop class=gmount t=info_bucket --no-print-directory | grep "^gs"
 
+#--foreground --debug_fuse --debug_fs --debug_gcs \
+
 gcp_mount:
-	@gsutil ls $(GCP_MOUNT_BUCKET) > /dev/null 2>&1; if [ $$? -eq 0 ]; then \
+	gsutil ls $(GCP_MOUNT_BUCKET) > /dev/null 2>&1; if [ $$? -eq 0 ]; then \
 	mkdir -p $(GCP_MOUNT_VAR) && \
 	gcsfuse $(GCP_GCSFUSE_EXTRA) \
 		-o allow_other \
@@ -127,3 +128,16 @@ gcp_du_total:
 	$(_R) $(_md)/R/gcp_du.r total.project.usage \
 		project=$(GCP_PROJECT_ID) \
 		unit=$(GCP_DU_TOTAL_UNIT)
+
+GCP_DU_TARGET?=gcp_du_project
+d_gcp_du:
+	mkdir -p $(GCP_DU_WORK_DIR)
+	$(MAKE) m=par par \
+		PAR_WORK_DIR=$(GCP_DU_WORK_DIR) \
+		PAR_MODULE=gcp \
+		PAR_NAME=gcp_du \
+		PAR_ODIR_VAR=GCP_DU_WORK_DIR \
+		PAR_TARGET=$(GCP_DU_TARGET) \
+		PAR_PREEMTIBLE=0 \
+		PAR_WAIT=$(TOP_WAIT) \
+		PAR_MAKEFLAGS="$(PAR_MAKEOVERRIDES)"

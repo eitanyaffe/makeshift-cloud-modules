@@ -43,9 +43,9 @@ localize.log=function(fn, out.bucket, odir)
     ofn = gsub(out.bucket, odir, fn)
     command = sprintf("gsutil -q cp %s %s", fn, ofn)
     rc = system(command)
-    if (rc == 130) exit(1)
+    if (rc == 130 || rc == 2) exit(rc)
     if (rc != 0)
-        cat(sprintf("warning: error downloading log file: %s", fn))
+        cat(sprintf("warning: error (rc=%d) downloading log file: %s", rc, fn))
 }
 
 download.log=function(log.path, recursive, out.bucket, level.i, odir)

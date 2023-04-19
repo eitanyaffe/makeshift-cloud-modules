@@ -1,2 +1,3 @@
 
 gcp/containers/mdocker-metagenomics/Dockerfile_test
+.DS_Store

@@ -36,8 +36,13 @@ du=function(ifn, project, check.all)
         } else {
             paths = bucket
         }
-        exec(paste("gsutil -mq du -hs ", paste(paths, collapse=" "), " | grep 'TiB\\|GiB'"),
-             ignore.error=T, verbose=F)
+        tryCatch(
+            exec(paste("gsutil -mq du -hs ", paste(paths, collapse=" "), " | grep 'TiB\\|GiB'"),
+                 ignore.error=F, verbose=F),
+            interrupt = function(err) {
+                message("interrupted")
+                exit(1)
+            } )
     }
 }
 

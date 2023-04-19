@@ -15,3 +15,4 @@ gcp_logs_download_key:
 		recursive=$(GCP_LOG_RECURSIVE) \
 		out.bucket=$(GCP_DSUB_ODIR_BUCKET) \
 		odir=$(GCP_LOG_RUN_DIR)
+	find $(GCP_LOG_RUN_DIR)

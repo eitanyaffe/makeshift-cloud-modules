@@ -100,11 +100,11 @@ PAR_CPU_COUNT?=2
 PAR_RAM_GB?=8
 
 # boot disk
-PAR_BOOT_GB?=12
+PAR_BOOT_GB?=16
 
 # data disk pd-ssd / pd-standard
 PAR_DISK_TYPE?=pd-standard
-PAR_DISK_GB?=8
+PAR_DISK_GB?=16
 
 ###############################################################################################
 # remove files and dirs

@@ -395,49 +395,52 @@ dsub.run=function(command, dry, wait, project, provider, job.keys, ms.level, log
         delete.subtree.tasks(job.key=job.keys[N], project=project, provider=provider, ms.level=ms.level)
     }
 
-    if (send.email.flag && email != "NONE" && sendgrid.key != "NONE") {
-        if (wait && (job.rc != 0 || ms.level <= max.report.level)) {
-            email.subject = sprintf("MS: %s/%d/%s: %s", job.id, ms.level, ms.title, if (job.rc == 0) "done" else "error")
-            labels = paste0("<br>", 1:ms.level, ") ms-job-key-", 1:ms.level, "=", job.keys, collapse=" ")
-            email.ll = list(Sender="Makeshift_pipeline_messenger", Project=project.name, Job_type=ms.type, Level=ms.level, Command=paste(ms.desc, collapse=" "), Return_code=job.rc, Logs=logging, Labels=labels)
-            email.message = format.email.message(email.ll)
+    should.send.email = send.email.flag && email != "NONE" && sendgrid.key != "NONE" && wait
+    
+    should.send.email = should.send.email && (ms.level <= max.report.level)
+    # should.send.email = should.send.email && (job.rc != 0 || ms.level <= max.report.level)
+    
+    if (should.send.email) {
+        email.subject = sprintf("MS: %s/%d/%s: %s", job.id, ms.level, ms.title, if (job.rc == 0) "done" else "error")
+        labels = paste0("<br>", 1:ms.level, ") ms-job-key-", 1:ms.level, "=", job.keys, collapse=" ")
+        email.ll = list(Sender="Makeshift_pipeline_messenger", Project=project.name, Job_type=ms.type, Level=ms.level, Command=paste(ms.desc, collapse=" "), Return_code=job.rc, Logs=logging, Labels=labels)
+        email.message = format.email.message(email.ll)
+        
+        # get logs
+        fns = system(sprintf("gsutil -mq ls %s*.log", gsub(".log", "", logging)), intern=T)
             
-            # get logs
-            fns = system(sprintf("gsutil -mq ls %s*.log", gsub(".log", "", logging)), intern=T)
+        # do not send too many log files
+        if (length(fns) > 20)
+            fns = fns[1:20]
+        
+        system("rm -rf /tmp/ms_logs && mkdir -p /tmp/ms_logs")
+        cat(sprintf("attaching to email log files: %s\n", paste(fns, collapse=" ")))
+        attachments = NULL
+        for (fn in fns) {
+            tfn = paste0("/tmp/ms_logs/", basename(fn))
+            exec(sprintf("gsutil -mq cat %s | grep -v 'INFO: gsutil -h Content-Type:text/plain' | grep -v 'Starting a garbage collection run' | grep -v 'Garbage collection succeeded after' > %s",
+                         fn, tfn), ignore.error=T)
+            if (file.info(tfn)$size > 0)
+                attachments = c(attachments, tfn)
+        }
+        if (length(fns) > 12) {
+            exec(sprintf("tar cvf /tmp/ms_logs.tar -C /tmp/ms_logs ."))
+            attachments = "/tmp/ms_logs.tar"
             
-            # do not send too many log files if successful 
-            if (length(fns) > 100)
-                fns = fns[1:100]
-            
-            system("rm -rf /tmp/ms_logs && mkdir -p /tmp/ms_logs")
-            cat(sprintf("attaching to email log files: %s\n", paste(fns, collapse=" ")))
-            attachments = NULL
-            for (fn in fns) {
-                tfn = paste0("/tmp/ms_logs/", basename(fn))
-                exec(sprintf("gsutil -mq cat %s | grep -v 'INFO: gsutil -h Content-Type:text/plain' | grep -v 'Starting a garbage collection run' | grep -v 'Garbage collection succeeded after' > %s",
-                             fn, tfn), ignore.error=T)
-                if (file.info(tfn)$size > 0)
-                    attachments = c(attachments, tfn)
-            }
-            if (length(fns) > 12) {
-                exec(sprintf("tar cvf /tmp/ms_logs.tar -C /tmp/ms_logs ."))
-                attachments = "/tmp/ms_logs.tar"
-                
-            }
-            rc = 1
-            count = 1
-            while (rc && count <= 4) { 
-                rc = send.email(sendgrid.key=sendgrid.key,
-                                from.email=email,
+        }
+        rc = 1
+        count = 1
+        while (rc && count <= 4) { 
+            rc = send.email(sendgrid.key=sendgrid.key,
+                            from.email=email,
                                 to.email=email,
-                                subject=email.subject,
-                                message=email.message,
-                                attachments=attachments)
-                if (rc) {
-                    system("sleep 30s")
-                    count = count + 1
-                    if (count == 4) attachments = NULL
-                }
+                            subject=email.subject,
+                            message=email.message,
+                            attachments=attachments)
+            if (rc) {
+                system("sleep 30s")
+                count = count + 1
+                if (count == 4) attachments = NULL
             }
         }
     }

@@ -28,9 +28,7 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
     x11-apps \
     less \
     libcurl4-gnutls-dev \
-    && apt-get clean all
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
+    rsync \
     liblapack-dev \
     liblapack3 \
     libopenblas-base \
@@ -41,6 +39,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     valgrind \
     libswitch-perl \
     cpanminus \
+    fuse \
+    screen \
     && apt-get clean all
 
 # make python3 the default
@@ -61,23 +61,13 @@ COPY modprobe.sh /usr/local/bin/modprobe
 COPY docker-entrypoint.sh /usr/local/bin/
 
 #############################################################################################
-# gcsfuse
-#############################################################################################
-
-RUN GCSFUSE_REPO="gcsfuse-`lsb_release -c -s`"; \
-    echo "deb http://packages.cloud.google.com/apt $GCSFUSE_REPO main" | \
-    tee /etc/apt/sources.list.d/gcsfuse.list
-RUN curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -
-RUN apt-get update && apt-get install --no-install-recommends -y gcsfuse && apt-get clean all
-
-#############################################################################################
 # dsub
 #############################################################################################
 
 RUN pip3 install dsub
 
 #############################################################################################
-# gsutil
+# gsutil and gcloud
 #############################################################################################
 
 # Downloading gcloud package
@@ -96,6 +86,9 @@ RUN apt-get update && \
     pip3 uninstall crcmod && \
     pip3 install --no-cache-dir -U crcmod && \
     apt-get clean all
+
+# gcloud
+RUN gcloud config set component_manager/disable_update_check true
 
 #############################################################################################
 # g++, gnumake
@@ -196,7 +189,7 @@ RUN mkdir -p /root/.ncbi && \
     printf '/repository/user/main/public/cache-disabled = "false"\n' >> /root/.ncbi/user-settings.mkfg
 
 # download not from bucket (from Amazon)
-#RUN mkdir -p /root/.ncbi && \
+# RUN mkdir -p /root/.ncbi && \
 #    printf '/LIBS/GUID = "%s"\n' `uuidgen` > /root/.ncbi/user-settings.mkfg && \
 #    printf '/libs/cloud/report_instance_identity = "false"\n' >> /root/.ncbi/user-settings.mkfg && \
 #    printf '/repository/user/main/public/cache-disabled = "true"\n' >> /root/.ncbi/user-settings.mkfg
@@ -320,6 +313,36 @@ RUN pip3 install -r /DomCycle/requirements.txt
 RUN cpanm install XML::Parser
 
 #############################################################################################
+# gcsfuse
+#############################################################################################
+
+# current version (0.42.1) fails to mount
+ENV GCSFUSE_VER=0.41.12
+RUN curl -L -O https://github.com/GoogleCloudPlatform/gcsfuse/releases/download/v${GCSFUSE_VER}/gcsfuse_${GCSFUSE_VER}_amd64.deb \
+    && dpkg --install gcsfuse_${GCSFUSE_VER}_amd64.deb
+
+#RUN GCSFUSE_REPO="gcsfuse-`lsb_release -c -s`"; \
+#    echo "deb http://packages.cloud.google.com/apt $GCSFUSE_REPO main" | \
+#    tee /etc/apt/sources.list.d/gcsfuse.list
+#RUN curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -
+#RUN apt-get update && apt-get install --no-install-recommends -y gcsfuse && apt-get clean all
+
+#############################################################################################
+# appendix
+#############################################################################################
+
+RUN R -e "install.packages('remotes')" \
+    && R -e "remotes::install_github('Van1yu3/SWKM')"
+
+RUN R -e "install.packages('diagram')"
+
+# for nice scatter plots
+RUN R -e "install.packages('ggrepel')"
+
+RUN sh -c "$(curl -fsSL ftp://ftp.ncbi.nlm.nih.gov/entrez/entrezdirect/install-edirect.sh)"
+ENV PATH $PATH:/root/edirect
+
+#############################################################################################
 # DESMAN
 #############################################################################################
 
@@ -328,16 +351,11 @@ RUN cpanm install XML::Parser
 #RUN cd /DESMAN && ./setup.py install
 
 #############################################################################################
-# gcloud
-#############################################################################################
-
-RUN gcloud config set component_manager/disable_update_check true
-
-#############################################################################################
 # aliases
 #############################################################################################
 
 RUN echo 'alias gcat="gsutil cat"' >> ~/.bashrc
+RUN echo 'alias gsync="make m=gcp rsync"' >> ~/.bashrc
 
 #############################################################################################
 # default command

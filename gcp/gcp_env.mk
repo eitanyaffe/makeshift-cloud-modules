@@ -9,9 +9,36 @@ validate_env:
 
 # to remove docker from quarantine on macos run 'xattr -d com.apple.quarantine /usr/local/bin/docker'
 
+# note: --privileged might be needed to run docker within docker, in case debugging inner docker run from environment
 # run image locally with X11
+denv_old: validate_env
+	docker run --rm -it \
+	       --cap-add SYS_ADMIN --device /dev/fuse --security-opt apparmor:unconfined \
+	       -v /tmp/.X11-unix:/tmp/.X11-unix \
+	       -e DISPLAY=host.docker.internal:0 \
+	       -e MAKESHIFT_ROOT=/makeshift \
+	       -e MAKESHIFT_LOCAL_PATH=$(MAKESHIFT_ROOT) \
+	       -v $(MAKESHIFT_ROOT):/makeshift \
+	       -e MAKESHIFT_CONFIG=/makeshift-config \
+	       -e GCP_PROJECT_ID=$(GCP_PROJECT_ID) \
+	       -v $(MAKESHIFT_CONFIG):/makeshift-config \
+	       -v $(dir $(MAKESHIFT_GCP_KEY)):/keys \
+	       -e GOOGLE_APPLICATION_CREDENTIALS=/keys/$(notdir $(MAKESHIFT_GCP_KEY)) \
+	       -e SENDGRID_API_KEY=$(PAR_SENDGRID_API_KEY) \
+	       -e PAR_NOTIFY_EMAIL=$(PAR_NOTIFY_EMAIL) \
+	       -e BOTO_CONFIG=/makeshift/.boto \
+	       -e USER=$(USER) \
+	       -e c=$(c) \
+	       -v /tmp:/tmp \
+	       -v /var/run/docker.sock:/var/run/docker.sock \
+	       -w /makeshift/$(GCP_PIPELINE_RELATIVE_DIR) \
+	       $(GCP_GCR_IMAGE_PATH) \
+	       bash -c "echo \"export PS1='[[$(PIPELINE_NAME):$(PROJECT_NAME)]] \w % '\" >> ~/.bashrc && make m=gcp mount_buckets bucket_summary && bash"; echo "RC=$$?"; date
+
+CONTAINER_NAME:=$(PIPELINE_NAME)-$(PROJECT_NAME)-$(shell bash -c 'echo $$RANDOM')
 denv: validate_env
-	docker run --rm -it --privileged \
+	docker run -d -it --name $(CONTAINER_NAME) \
+	       --cap-add SYS_ADMIN --device /dev/fuse --security-opt apparmor:unconfined \
 	       -v /tmp/.X11-unix:/tmp/.X11-unix \
 	       -e DISPLAY=host.docker.internal:0 \
 	       -e MAKESHIFT_ROOT=/makeshift \
@@ -32,6 +59,49 @@ denv: validate_env
 	       -w /makeshift/$(GCP_PIPELINE_RELATIVE_DIR) \
 	       $(GCP_GCR_IMAGE_PATH) \
 	       bash -c "echo \"export PS1='[[$(PIPELINE_NAME):$(PROJECT_NAME)]] \w % '\" >> ~/.bashrc && make m=gcp mount_buckets bucket_summary && bash"
+	docker attach $(CONTAINER_NAME); echo "RC=$$?"; date
+	docker rm $(CONTAINER_NAME)
+
+CONTAINER_NAME:=$(PIPELINE_NAME)-$(PROJECT_NAME)-$(shell bash -c 'echo $$RANDOM')
+denv2:
+	docker run -d -it --name $(CONTAINER_NAME) \
+	       --cap-add SYS_ADMIN --device /dev/fuse --security-opt apparmor:unconfined \
+	       -v /tmp/.X11-unix:/tmp/.X11-unix \
+	       -e DISPLAY=host.docker.internal:0 \
+	       -e MAKESHIFT_ROOT=/makeshift \
+	       -e MAKESHIFT_LOCAL_PATH=$(MAKESHIFT_ROOT) \
+	       -v $(MAKESHIFT_ROOT):/makeshift \
+	       -e MAKESHIFT_CONFIG=/makeshift-config \
+	       -e GCP_PROJECT_ID=$(GCP_PROJECT_ID) \
+	       -v $(MAKESHIFT_CONFIG):/makeshift-config \
+	       -v $(dir $(MAKESHIFT_GCP_KEY)):/keys \
+	       -e GOOGLE_APPLICATION_CREDENTIALS=/keys/$(notdir $(MAKESHIFT_GCP_KEY)) \
+	       -e SENDGRID_API_KEY=$(PAR_SENDGRID_API_KEY) \
+	       -e PAR_NOTIFY_EMAIL=$(PAR_NOTIFY_EMAIL) \
+	       -e BOTO_CONFIG=/makeshift/.boto \
+	       -e USER=$(USER) \
+	       -e c=$(c) \
+	       -v /tmp:/tmp \
+	       -v /var/run/docker.sock:/var/run/docker.sock \
+	       -w /makeshift/$(GCP_PIPELINE_RELATIVE_DIR) \
+	       $(GCP_GCR_IMAGE_PATH) \
+	       bash -c "echo \"export PS1='[[$(PIPELINE_NAME):$(PROJECT_NAME)]] \w % '\" >> ~/.bashrc && bash"
+	docker attach $(CONTAINER_NAME); echo "RC=$$?"; date
+
+# all system logs:
+# sudo log collect --last 1h --output macos
+
+# docker logs from system
+# pred='process matches ".*(ocker|vpnkit).*" || (process in {"taskgated-helper", "launchservicesd", "kernel"} && eventMessage contains[c] "docker")'
+# /usr/bin/log show --debug --info --style syslog --last 1h --predicate "$pred" >/tmp/logs.txt
+
+
+# docker logs:
+# cp ~/Library/Containers/com.docker.docker/Data/log/vm/dockerd.log . 
+# cp ~/Library/Containers/com.docker.docker/Data/log/vm/containerd.log .
+# cp ~/Library/Containers/com.docker.docker/Data/vms/0/console-ring .
+
+# shim explained: https://iximiuz.com/en/posts/implementing-container-runtime-shim
 
 # run in VM
 venv:
