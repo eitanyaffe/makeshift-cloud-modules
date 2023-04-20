@@ -141,8 +141,8 @@ PAR_EMAIL?=T
 # job id, shared by entire nested tree
 ###############################################################################################
 
-# submitting user
-PAR_USER?=$(USER)
+# submitting user, must be lower case
+PAR_USER=$(shell echo $(USER) | tr A-Z a-z)
 
 PAR_DATE?=$(shell date +'%m-%d-%Y')
 
