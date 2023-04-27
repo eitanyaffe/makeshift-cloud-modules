@@ -14,8 +14,8 @@ TOP_WORK_DIR?=$(TOP_DIR)/work
 # when true cloud jobs are not submitted
 DRY?=F
 
-# T: wait for job, F: submit and finish
-TOP_WAIT?=T
+# T: wait for job, F: launch job and return
+TOP_WAIT?=F
 
 # can be dsub (through gcp) or local
 PAR_TYPE?=dsub
