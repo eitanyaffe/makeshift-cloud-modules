@@ -15,7 +15,7 @@ TOP_WORK_DIR?=$(TOP_DIR)/work
 DRY?=F
 
 # T: wait for job, F: launch job and return
-TOP_WAIT?=F
+TOP_WAIT?=T
 
 # can be dsub (through gcp) or local
 PAR_TYPE?=dsub

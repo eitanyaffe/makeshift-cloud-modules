@@ -105,6 +105,18 @@ qdel:
 	gsutil -mq rm -rf $(GCP_DSUB_ODIR_BUCKET)/$X
 
 ###############################################################################################
+# compress/decompress files
+###############################################################################################
+
+gcp_compress:
+	$(_R) $(_md)/R/gcp_utils.r compress.find \
+	       base.mount=$(GCP_DSUB_ODIR_BUCKET_BASE) \
+	       out.bucket=$(GCP_DSUB_ODIR_BUCKET) \
+	       base.dir=$(GCP_COMPRESS_DIR) \
+	       name.pattern=$(GCP_COMPRESS_NAME_PATTERN)
+
+
+###############################################################################################
 # bucket disk usage
 ###############################################################################################
 

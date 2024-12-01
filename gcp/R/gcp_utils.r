@@ -1,3 +1,4 @@
+
 path2bucket=function(path, out.bucket, base.mount)
 {
     if (grepl(base.mount, path)) {
@@ -7,6 +8,10 @@ path2bucket=function(path, out.bucket, base.mount)
     }
 }
 
+###############################################################################################
+# remove
+###############################################################################################
+
 remove.paths=function(base.mount, out.bucket, paths)
 {
     for (path in paths) {
@@ -14,6 +19,7 @@ remove.paths=function(base.mount, out.bucket, paths)
 
         if (system(paste("gsutil ls", pp), ignore.stdout=T, ignore.stderr=T) == 0) {
             cat(sprintf("removing bucket path: %s\n", pp))
+            system(paste("sleep 1s"))
             system(paste("gsutil -mq rm -rf", pp))
         }
         
@@ -22,15 +28,43 @@ remove.paths=function(base.mount, out.bucket, paths)
 
 remove.find=function(base.mount, out.bucket, base.dir, name.pattern)
 {
-    paths = system(sprintf("find %s -name '%s'", base.dir, name.pattern), intern=T)
+    cmd = sprintf("find %s -name '%s'", base.dir, name.pattern)
+    cat(sprintf("running command: %s\n", cmd))
+    paths = system(cmd, intern=T)
     if (is.null(paths) || (length(paths) == 0))
         return (NULL)
     for (path in paths) {
         pp = path2bucket(path=path, out.bucket=out.bucket, base.mount=base.mount)
         if (system(paste("gsutil ls", pp), ignore.stdout=T, ignore.stderr=T) == 0) {
             cat(sprintf("removing bucket path: %s\n", pp))
+            system(paste("sleep 1s"))
             system(paste("gsutil -mq rm -rf", pp))
         }
         
+    }
+}
+
+
+###############################################################################################
+# compress
+###############################################################################################
+
+compress.find=function(base.mount, out.bucket, base.dir, name.pattern)
+{
+    cmd = sprintf("find %s -name '%s'", base.dir, name.pattern)
+    cat(sprintf("running command: %s\n", cmd))
+    paths = system(cmd, intern=T)
+    if (is.null(paths) || (length(paths) == 0))
+        return (NULL)
+    for (path in paths) {
+        pp = path2bucket(path=path, out.bucket=out.bucket, base.mount=base.mount)
+        if (system(paste("gsutil ls", pp), ignore.stdout=T, ignore.stderr=T) == 0) {
+            # cat(sprintf("compressing %s\n", pp))
+            # system(sprintf("pigz -p 8 -c %s > /tmp/x.gz", path))
+            # system(sprintf("gsutil -mq cp /tmp/x.gz %s.gz", pp))
+            cat(sprintf("handling %s\n", pp))
+            system(sprintf("gsutil -mq cp %s.gz %s", pp, pp))
+            system(sprintf("gsutil -mq rm %s.gz", pp))
+        }
     }
 }

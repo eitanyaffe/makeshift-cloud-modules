@@ -397,8 +397,8 @@ dsub.run=function(command, dry, wait, project, provider, job.keys, ms.level, log
 
     should.send.email = send.email.flag && email != "NONE" && sendgrid.key != "NONE" && wait
     
-    should.send.email = should.send.email && (ms.level <= max.report.level)
-    # should.send.email = should.send.email && (job.rc != 0 || ms.level <= max.report.level)
+    # should.send.email = should.send.email && (ms.level <= max.report.level)
+    should.send.email = should.send.email && (job.rc != 0 || ms.level <= max.report.level)
     
     if (should.send.email) {
         email.subject = sprintf("MS: %s/%d/%s: %s", job.id, ms.level, ms.title, if (job.rc == 0) "done" else "error")

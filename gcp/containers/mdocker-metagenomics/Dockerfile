@@ -339,16 +339,23 @@ RUN R -e "install.packages('diagram')"
 # for nice scatter plots
 RUN R -e "install.packages('ggrepel')"
 
+RUN R -e "install.packages(c('aod', 'pROC', 'caret'))"
+
 RUN sh -c "$(curl -fsSL ftp://ftp.ncbi.nlm.nih.gov/entrez/entrezdirect/install-edirect.sh)"
 ENV PATH $PATH:/root/edirect
 
-#############################################################################################
-# DESMAN
-#############################################################################################
+# vim
+RUN apt-get update && apt-get install --no-install-recommends -y vim
 
-#RUN git clone https://github.com/chrisquince/DESMAN.git /DESMAN
-#RUN pip3 install Cython
-#RUN cd /DESMAN && ./setup.py install
+# lftp
+RUN apt-get update && apt-get install --no-install-recommends -y lftp
+
+# MOB-suite
+RUN apt-get -y install libgnutls28-dev
+RUN pip3 install Bio
+RUN pip3 install mob_suite
+
+RUN R -e "install.packages(c('hexbin', 'MASS'))"
 
 #############################################################################################
 # aliases
