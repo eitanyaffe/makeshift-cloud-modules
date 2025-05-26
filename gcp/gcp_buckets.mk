@@ -63,6 +63,9 @@ gcp_create_mount: gcp_mb gcp_mount
 mount_bucket:
 	@$(MAKE) class_step class=gmount instance=$i t=gcp_mount
 
+create_bucket:
+	@$(MAKE) class_step class=gmount instance=$i t=gcp_mb
+
 create_mount_bucket:
 	@$(MAKE) class_step class=gmount instance=$i t=gcp_create_mount
 

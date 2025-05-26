@@ -158,15 +158,6 @@ RUN apt-get install --no-install-recommends -y bwa samtools && \
 RUN pip3 install sendgrid khmer sourmash
 
 #############################################################################################
-# spades assembler
-#############################################################################################
-
-RUN mkdir -p /usr/local/spades && \
-    cd /usr/local/spades && \
-    wget http://cab.spbu.ru/files/release3.15.3/SPAdes-3.15.3-Linux.tar.gz && \
-    tar zvxf SPAdes-3.15.3-Linux.tar.gz && rm -rf SPAdes-3.15.3-Linux.tar.gz
-
-#############################################################################################
 # diamond
 #############################################################################################
 
@@ -356,6 +347,38 @@ RUN pip3 install Bio
 RUN pip3 install mob_suite
 
 RUN R -e "install.packages(c('hexbin', 'MASS'))"
+
+#############################################################################################
+# metaMDBG
+#############################################################################################
+
+RUN apt-get update && apt-get -y install cmake
+RUN mkdir -p /usr/local/metaMDBG && \
+    git clone https://github.com/GaetanBenoitDev/metaMDBG.git /usr/local/metaMDBG && \
+    cd /usr/local/metaMDBG && mkdir build && cd build && cmake .. && make -j 3
+ENV PATH $PATH:/usr/local/metaMDBG/build/bin
+
+ARG MINIMAP2_VER="2.28"
+RUN curl -L https://github.com/lh3/minimap2/releases/download/v${MINIMAP2_VER}/minimap2-${MINIMAP2_VER}_x64-linux.tar.bz2 | tar -jxvf -
+ENV PATH $PATH:/minimap2-${MINIMAP2_VER}_x64-linux
+
+#############################################################################################
+# kraken2
+#############################################################################################
+
+RUN git clone https://github.com/DerrickWood/kraken2.git /kraken2_code && \
+    cd /kraken2_code && \
+    ./install_kraken2.sh /kraken2 && \
+    rm -rf /kraken2_code
+ENV PATH $PATH:/kraken2
+
+RUN apt-get update && apt-get install --no-install-recommends -y aria2 && apt-get clean all
+
+#############################################################################################
+# final R packages
+#############################################################################################
+
+RUN R -e "install.packages(c('patchwork'))"
 
 #############################################################################################
 # aliases
