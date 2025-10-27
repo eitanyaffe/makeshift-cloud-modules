@@ -1,12 +1,11 @@
-# Ubuntu 20.04.1 LTS
-FROM ubuntu:20.04
+FROM ubuntu:22.04
 
 #############################################################################################
 # basics
 #############################################################################################
 
-ENV DEBIAN_FRONTEND="noninteractive"
-ENV TZ="America/Los_Angeles"
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=America/Los_Angeles
 
 RUN apt-get update && apt-get install --no-install-recommends -y \
     git \
@@ -15,11 +14,9 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
     sudo \
     bash-completion \
     gnupg2 \
-    python3.6 \
     python3-pip \
     apt-transport-https \
     ca-certificates \
-    curl \
     gnupg \
     wget \
     time \
@@ -31,7 +28,7 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
     rsync \
     liblapack-dev \
     liblapack3 \
-    libopenblas-base \
+    libopenblas0 \
     libopenblas-dev \
     locate \
     libboost-all-dev \
@@ -61,10 +58,24 @@ COPY modprobe.sh /usr/local/bin/modprobe
 COPY docker-entrypoint.sh /usr/local/bin/
 
 #############################################################################################
-# dsub
+# python venv
 #############################################################################################
 
-RUN pip3 install dsub
+# Install build tools and venv package first
+RUN apt-get update && \
+    apt-get -y install gcc python3-dev python3-venv python3-setuptools --no-install-recommends && \
+    apt-get clean all
+
+# Create venv
+RUN python3 -m venv /opt/venv
+
+# Upgrade pip inside venv
+RUN /opt/venv/bin/pip install --upgrade pip
+
+# Add venv bin to PATH
+ENV VENV_DIR="/opt/venv"
+ENV VENV_PIP="$VENV_DIR/bin/pip"
+ENV PATH="$VENV_DIR/bin:$PATH"
 
 #############################################################################################
 # gsutil and gcloud
@@ -79,13 +90,10 @@ RUN curl https://dl.google.com/dl/cloudsdk/release/google-cloud-sdk.tar.gz > \
     && rm /tmp/google-cloud-sdk.tar.gz
 
 # Adding the package path to local
-ENV PATH $PATH:/usr/local/gcloud/google-cloud-sdk/bin
+ENV PATH=$PATH:/usr/local/gcloud/google-cloud-sdk/bin
 
-RUN apt-get update && \
-    apt-get -y install gcc python3-dev python3-setuptools --no-install-recommends && \
-    pip3 uninstall crcmod && \
-    pip3 install --no-cache-dir -U crcmod && \
-    apt-get clean all
+# Install crcmod in venv
+RUN $VENV_PIP install --no-cache-dir -U crcmod
 
 # gcloud
 RUN gcloud config set component_manager/disable_update_check true
@@ -101,31 +109,36 @@ RUN apt-get install --no-install-recommends -y build-essential libgsl0-dev && \
 # R
 #############################################################################################
 
-RUN echo "deb https://cloud.r-project.org/bin/linux/ubuntu focal-cran40/" >> /etc/apt/sources.list
-RUN apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys E298A3A825C0D65DFD57CBB651716619E084DAB9
+RUN mkdir -p /etc/apt/keyrings && \
+    curl -fsSL https://cloud.r-project.org/bin/linux/ubuntu/marutter_pubkey.asc \
+    | gpg --dearmor -o /etc/apt/keyrings/cran.gpg
+
+RUN echo "deb [signed-by=/etc/apt/keyrings/cran.gpg] \
+    https://cloud.r-project.org/bin/linux/ubuntu jammy-cran40/" >> /etc/apt/sources.list
+
 RUN apt-get update \
     && apt-get install --no-install-recommends -y r-base r-base-dev \
     && apt-get clean all
 
 #############################################################################################
-# R packages
+# gcsfuse
 #############################################################################################
 
-# basic packages
-RUN R -e "install.packages(c('igraph', 'intervals', 'gplots', 'BiocManager'))"
-RUN R -e "install.packages('seqinr', dependencies=TRUE, repos='http://cran.rstudio.com/')"
+# current version (0.42.1) fails to mount
+ENV GCSFUSE_VER=0.41.12
+RUN curl -L -O https://github.com/GoogleCloudPlatform/gcsfuse/releases/download/v${GCSFUSE_VER}/gcsfuse_${GCSFUSE_VER}_amd64.deb \
+    && dpkg --install gcsfuse_${GCSFUSE_VER}_amd64.deb
 
-# visualization
-RUN R -e "install.packages(c('umap', 'Rtsne'))"
+#############################################################################################
+# dsub
+#############################################################################################
 
-# Biostrings
-RUN R -e "BiocManager::install('Biostrings', ask=F)"
+# Install google-cloud-batch in venv
+RUN $VENV_PIP install google-cloud-batch
 
-# for strain analysis
-RUN R -e "BiocManager::install(c('dendextend', 'phangorn', 'phylogram'))"
-
-# for G4iMGrinder
-RUN R -e "BiocManager::install('pqsfinder')"
+# Clone dsub and install in venv
+RUN git clone https://github.com/DataBiosphere/dsub /dsub && \
+    cd /dsub && $VENV_PIP install .
 
 #############################################################################################
 # megahit
@@ -135,7 +148,7 @@ RUN mkdir -p /usr/local/megahit && \
     cd /usr/local/megahit && \
     wget https://github.com/voutcn/megahit/releases/download/v1.2.9/MEGAHIT-1.2.9-Linux-x86_64-static.tar.gz && \
     tar zvxf MEGAHIT-1.2.9-Linux-x86_64-static.tar.gz && rm -rf MEGAHIT-1.2.9-Linux-x86_64-static.tar.gz
-ENV MEGAHIT_BIN /usr/local/megahit/MEGAHIT-1.2.9-Linux-x86_64-static/bin/megahit
+ENV MEGAHIT_BIN=/usr/local/megahit/MEGAHIT-1.2.9-Linux-x86_64-static/bin/megahit
 
 #############################################################################################
 # prodigal
@@ -155,7 +168,7 @@ RUN apt-get install --no-install-recommends -y bwa samtools && \
 # sendgrid / khmer / sourmash
 #############################################################################################
 
-RUN pip3 install sendgrid khmer sourmash
+RUN $VENV_PIP install sendgrid khmer sourmash
 
 #############################################################################################
 # diamond
@@ -179,12 +192,6 @@ RUN mkdir -p /root/.ncbi && \
     printf '/libs/cloud/report_instance_identity = "true"\n' >> /root/.ncbi/user-settings.mkfg && \
     printf '/repository/user/main/public/cache-disabled = "false"\n' >> /root/.ncbi/user-settings.mkfg
 
-# download not from bucket (from Amazon)
-# RUN mkdir -p /root/.ncbi && \
-#    printf '/LIBS/GUID = "%s"\n' `uuidgen` > /root/.ncbi/user-settings.mkfg && \
-#    printf '/libs/cloud/report_instance_identity = "false"\n' >> /root/.ncbi/user-settings.mkfg && \
-#    printf '/repository/user/main/public/cache-disabled = "true"\n' >> /root/.ncbi/user-settings.mkfg
-
 #############################################################################################
 # cdhit
 #############################################################################################
@@ -204,7 +211,7 @@ RUN cd /opt && \
     tar xvf ncbi-blast-2.8.1+-x64-linux.tar.gz && \
     rm -f ncbi-blast-2.8.1+-x64-linux.tar.gz
 
-ENV PATH="/opt/cd-hit:/opt/cd-hit/cd-hit-auxtools:/opt/cd-hit/psi-cd-hit:/opt/ncbi-blast-2.8.1+/bin:${PATH}"
+ENV PATH=/opt/cd-hit:/opt/cd-hit/cd-hit-auxtools:/opt/cd-hit/psi-cd-hit:/opt/ncbi-blast-2.8.1+/bin:${PATH}
 
 #############################################################################################
 # MMSeqs2
@@ -214,7 +221,7 @@ RUN cd /usr/local && \
     wget https://mmseqs.com/latest/mmseqs-linux-avx2.tar.gz && \
     tar xvfz mmseqs-linux-avx2.tar.gz && \
     rm -rf mmseqs-linux-avx2.tar.gz
-ENV PATH $PATH:/usr/local/mmseqs/bin
+ENV PATH=$PATH:/usr/local/mmseqs/bin
 
 #############################################################################################
 # eggNOG
@@ -224,7 +231,7 @@ RUN mkdir /eggNOG && cd /eggNOG && \
     wget --no-check-certificate https://github.com/eggnogdb/eggnog-mapper/archive/refs/tags/2.1.7.tar.gz && \
     tar xvfz 2.1.7.tar.gz && \
     rm -rf 2.1.7.tar.gz && cd eggnog-mapper-2.1.7 && \
-    pip install -r requirements.txt
+    $VENV_PIP install -r requirements.txt
 
 #############################################################################################
 # clustal
@@ -235,22 +242,33 @@ RUN wget http://www.clustal.org/omega/clustalo-1.2.4-Ubuntu-x86_64 && \
     chmod a+x /usr/local/bin/clustalo-1.2.4-Ubuntu-x86_64
 
 #############################################################################################
-# StrainFinder
+# StrainFinder (Python 2, pinned)
 #############################################################################################
 
+# Clone StrainFinder
 RUN git clone https://github.com/cssmillie/StrainFinder.git /StrainFinder && \
-    apt install -y python2 && \
+    apt-get update && \
+    apt-get install -y python2 python2-dev && \
     curl https://bootstrap.pypa.io/pip/2.7/get-pip.py --output get-pip.py && \
     python2 get-pip.py && \
-    apt-get install -y python-dev && apt-get clean all && \
-    pip2 install numpy scipy && \
-    pip2 install openopt FuncDesigner DerApproximator
+    rm get-pip.py && \
+    apt-get clean all
+
+# Install numpy first
+RUN pip2 install numpy==1.16.6
+
+# Then install the rest
+RUN pip2 install \
+    scipy==1.2.3 \
+    openopt==0.5629 \
+    FuncDesigner==0.5629 \
+    DerApproximator==0.5201
 
 #############################################################################################
 # Pandas
 #############################################################################################
 
-RUN pip install pandas
+RUN $VENV_PIP install pandas
 
 #############################################################################################
 # GTDB-TK
@@ -260,13 +278,18 @@ RUN pip install pandas
 RUN apt-get update -y -m && \
     apt-get install --no-install-recommends --no-install-suggests -y \
         hmmer=3.* \
-        mash=2.2.* \
         prodigal=1:2.6.* \
         fasttree=2.1.* \
         unzip && \
     apt-get clean all && \
     rm -rf /var/lib/apt/lists/* && \
     ln -s /usr/bin/fasttreeMP /usr/bin/FastTreeMP
+
+# Manually install mash
+RUN wget https://github.com/marbl/Mash/releases/download/v2.3/mash-Linux64-v2.3.tar && \
+    tar xvf mash-Linux64-v2.3.tar && \
+    mv mash-Linux64-v2.3/mash /usr/local/bin && \
+    rm -rf mash-Linux64-v2.3 mash-Linux64-v2.3.tar
 
 # PPLACER
 RUN wget https://github.com/matsen/pplacer/releases/download/v1.1.alpha19/pplacer-linux-v1.1.alpha19.zip -q && \
@@ -280,22 +303,19 @@ RUN wget https://github.com/ParBLiSS/FastANI/releases/download/v1.33/fastANI-Lin
     unzip fastANI-Linux64-v1.33.zip -d /usr/bin && \
     rm fastANI-Linux64-v1.33.zip
 
+# SKANI
+RUN wget https://github.com/bluenote-1577/skani/releases/latest/download/skani \
+    && chmod +x skani \
+    && mv skani /usr/local/bin/
+
 # GTDB-TK
-RUN pip3 install gtdbtk
+RUN $VENV_PIP install gtdbtk
 
 #############################################################################################
 # CheckM
 #############################################################################################
 
-RUN pip3 install numpy matplotlib pysam checkm-genome
-
-#############################################################################################
-# Domcycle
-#############################################################################################
-
-ARG FORCE_REBUILD=unknown
-RUN git clone https://github.com/nshalon/DomCycle.git /DomCycle
-RUN pip3 install -r /DomCycle/requirements.txt
+RUN $VENV_PIP install numpy matplotlib pysam checkm-genome
 
 #############################################################################################
 # XML::Parser for parsing GOA_UNIPROT_TABLE
@@ -304,23 +324,63 @@ RUN pip3 install -r /DomCycle/requirements.txt
 RUN cpanm install XML::Parser
 
 #############################################################################################
-# gcsfuse
+# metaMDBG
 #############################################################################################
 
-# current version (0.42.1) fails to mount
-ENV GCSFUSE_VER=0.41.12
-RUN curl -L -O https://github.com/GoogleCloudPlatform/gcsfuse/releases/download/v${GCSFUSE_VER}/gcsfuse_${GCSFUSE_VER}_amd64.deb \
-    && dpkg --install gcsfuse_${GCSFUSE_VER}_amd64.deb
+RUN apt-get update && apt-get -y install cmake
+RUN mkdir -p /usr/local/metaMDBG && \
+    git clone https://github.com/GaetanBenoitDev/metaMDBG.git /usr/local/metaMDBG && \
+    cd /usr/local/metaMDBG && mkdir build && cd build && cmake .. && make -j 3
+ENV PATH=$PATH:/usr/local/metaMDBG/build/bin
 
-#RUN GCSFUSE_REPO="gcsfuse-`lsb_release -c -s`"; \
-#    echo "deb http://packages.cloud.google.com/apt $GCSFUSE_REPO main" | \
-#    tee /etc/apt/sources.list.d/gcsfuse.list
-#RUN curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -
-#RUN apt-get update && apt-get install --no-install-recommends -y gcsfuse && apt-get clean all
+ARG MINIMAP2_VER="2.28"
+RUN curl -L https://github.com/lh3/minimap2/releases/download/v${MINIMAP2_VER}/minimap2-${MINIMAP2_VER}_x64-linux.tar.bz2 | tar -jxvf -
+ENV PATH=$PATH:/minimap2-${MINIMAP2_VER}_x64-linux
 
 #############################################################################################
-# appendix
+# kraken2
 #############################################################################################
+
+RUN git clone https://github.com/DerrickWood/kraken2.git /kraken2_code && \
+    cd /kraken2_code && \
+    ./install_kraken2.sh /kraken2 && \
+    rm -rf /kraken2_code
+ENV PATH=$PATH:/kraken2
+
+RUN apt-get update && apt-get install --no-install-recommends -y aria2 && apt-get clean all
+
+#############################################################################################
+# barrnap
+#############################################################################################
+
+# requires bedtools
+RUN apt-get update && apt-get install --no-install-recommends -y bedtools \
+    && apt-get clean all
+
+RUN git clone https://github.com/tseemann/barrnap.git /opt/barrnap \
+    && ln -s /opt/barrnap/bin/barrnap /usr/local/bin/barrnap
+
+#############################################################################################
+# R packages
+#############################################################################################
+
+# basic packages
+RUN R -e "install.packages(c('igraph', 'intervals', 'gplots', 'BiocManager'))"
+RUN R -e "install.packages('seqinr', dependencies=TRUE, repos='http://cran.rstudio.com/')"
+
+# visualization
+RUN R -e "install.packages(c('umap', 'Rtsne'))"
+
+# Biostrings
+RUN R -e "BiocManager::install('Biostrings', ask=F)"
+
+# for strain analysis
+RUN R -e "BiocManager::install(c('dendextend', 'phangorn', 'phylogram'))"
+
+# for G4iMGrinder
+RUN R -e "BiocManager::install('pqsfinder')"
+
+RUN R -e "install.packages(c('patchwork'))"
 
 RUN R -e "install.packages('remotes')" \
     && R -e "remotes::install_github('Van1yu3/SWKM')"
@@ -332,8 +392,14 @@ RUN R -e "install.packages('ggrepel')"
 
 RUN R -e "install.packages(c('aod', 'pROC', 'caret'))"
 
+RUN R -e "install.packages(c('hexbin', 'MASS'))"
+
+#############################################################################################
+# appendix
+#############################################################################################
+
 RUN sh -c "$(curl -fsSL ftp://ftp.ncbi.nlm.nih.gov/entrez/entrezdirect/install-edirect.sh)"
-ENV PATH $PATH:/root/edirect
+ENV PATH=$PATH:/root/edirect
 
 # vim
 RUN apt-get update && apt-get install --no-install-recommends -y vim
@@ -343,43 +409,9 @@ RUN apt-get update && apt-get install --no-install-recommends -y lftp
 
 # MOB-suite
 RUN apt-get -y install libgnutls28-dev
-RUN pip3 install Bio
-RUN pip3 install mob_suite
-
-RUN R -e "install.packages(c('hexbin', 'MASS'))"
-
-#############################################################################################
-# metaMDBG
-#############################################################################################
-
-RUN apt-get update && apt-get -y install cmake
-RUN mkdir -p /usr/local/metaMDBG && \
-    git clone https://github.com/GaetanBenoitDev/metaMDBG.git /usr/local/metaMDBG && \
-    cd /usr/local/metaMDBG && mkdir build && cd build && cmake .. && make -j 3
-ENV PATH $PATH:/usr/local/metaMDBG/build/bin
-
-ARG MINIMAP2_VER="2.28"
-RUN curl -L https://github.com/lh3/minimap2/releases/download/v${MINIMAP2_VER}/minimap2-${MINIMAP2_VER}_x64-linux.tar.bz2 | tar -jxvf -
-ENV PATH $PATH:/minimap2-${MINIMAP2_VER}_x64-linux
-
-#############################################################################################
-# kraken2
-#############################################################################################
-
-RUN git clone https://github.com/DerrickWood/kraken2.git /kraken2_code && \
-    cd /kraken2_code && \
-    ./install_kraken2.sh /kraken2 && \
-    rm -rf /kraken2_code
-ENV PATH $PATH:/kraken2
-
-RUN apt-get update && apt-get install --no-install-recommends -y aria2 && apt-get clean all
-
-#############################################################################################
-# final R packages
-#############################################################################################
-
-RUN R -e "install.packages(c('patchwork'))"
-
+RUN $VENV_PIP install Bio
+RUN $VENV_PIP install mob_suite
+    
 #############################################################################################
 # aliases
 #############################################################################################
@@ -387,8 +419,12 @@ RUN R -e "install.packages(c('patchwork'))"
 RUN echo 'alias gcat="gsutil cat"' >> ~/.bashrc
 RUN echo 'alias gsync="make m=gcp rsync"' >> ~/.bashrc
 
+# glg gets and cleans
+COPY glg /usr/local/bin/glg
+RUN chmod +x /usr/local/bin/glg
+
 #############################################################################################
 # default command
 #############################################################################################
 
-CMD bash
+CMD ["bash"]

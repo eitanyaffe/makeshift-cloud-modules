@@ -1,0 +1,58 @@
+# Ubuntu 20.04.1 LTS
+FROM ubuntu:20.04
+
+
+#############################################################################################
+# basics
+#############################################################################################
+
+ENV DEBIAN_FRONTEND="noninteractive"
+ENV TZ="America/Los_Angeles"
+
+RUN apt-get update && apt-get install --no-install-recommends -y \
+    git \
+    lsb-release \
+    curl \
+    sudo \
+    bash-completion \
+    gnupg2 \
+    python3.6 \
+    python3-pip \
+    apt-transport-https \
+    ca-certificates \
+    curl \
+    gnupg \
+    wget \
+    time \
+    pigz \
+    bc \
+    x11-apps \
+    less \
+    libcurl4-gnutls-dev \
+    && apt-get clean all
+
+RUN echo "deb https://cloud.r-project.org/bin/linux/ubuntu focal-cran40/" >> /etc/apt/sources.list
+RUN apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys E298A3A825C0D65DFD57CBB651716619E084DAB9
+RUN apt-get update \
+    && apt-get install --no-install-recommends -y r-base r-base-dev \
+    && apt-get clean all
+
+#############################################################################################
+# Basic R packages
+#############################################################################################
+
+RUN R -e "install.packages(c('igraph', 'intervals', 'gplots', 'BiocManager'))"
+RUN R -e "install.packages('seqinr', dependencies=TRUE, repos='http://cran.rstudio.com/')"
+RUN R -e "install.packages(c('umap', 'Rtsne'))"
+
+#############################################################################################
+# BiocManager and Biotstrings
+#############################################################################################
+
+RUN R -e "BiocManager::install('Biostrings', ask=F)"
+
+# strain analysis
+RUN R -e "BiocManager::install(c('dendextend', 'phangorn', 'phylogram'))"
+
+# G4iMGrinder
+RUN R -e "BiocManager::install('pqsfinder')"

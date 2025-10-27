@@ -1,0 +1,65 @@
+#!/usr/bin/env python3
+import sys
+import subprocess
+import re
+import signal
+
+# Gracefully handle piping to 'head' or other short readers
+signal.signal(signal.SIGPIPE, signal.SIG_DFL)
+
+if len(sys.argv) != 2:
+    print("Usage: glg <logfile_or_gsurl>", file=sys.stderr)
+    sys.exit(1)
+
+input_path = sys.argv[1]
+
+# Skip lines with this pattern
+skip_pattern = re.compile(r'gsutil -h Content-Type:text/plain')
+
+# Extract date/time and remove [task_id:...] part
+# Pattern matches: optional prefix, date/time, optional INFO/etc, [task_id:...], remaining content
+log_pattern = re.compile(r'^(?:.*?)(\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2})(?:\s+\w+:)?\s*\[task_id:[^]]+\]\s*(.*)')
+
+def clean(line):
+    if skip_pattern.search(line):
+        return None
+    
+    # Try to match the log pattern with date/time and task_id
+    match = log_pattern.match(line)
+    if match:
+        timestamp = match.group(1)
+        remaining = match.group(2)
+        if remaining.strip():
+            return f"{timestamp} {remaining.strip()}"
+        else:
+            return timestamp
+    
+    # If no match, return the line as-is (after stripping)
+    return line.strip() if line.strip() else None
+
+def line_stream(path):
+    if path == "-":
+        return sys.stdin
+    elif path.startswith("gs://"):
+        proc = subprocess.Popen(["gsutil", "cat", path], stdout=subprocess.PIPE, text=True)
+        if proc.stdout is None:
+            raise RuntimeError(f"Failed to open gs:// path: {path}")
+        return proc.stdout
+    else:
+        return open(path, "r")
+
+try:
+    with line_stream(input_path) as f:
+        for line in f:
+            cleaned = clean(line)
+            if cleaned:
+                try:
+                    print(cleaned)
+                except BrokenPipeError:
+                    break
+except FileNotFoundError:
+    print(f"Error: File '{input_path}' not found", file=sys.stderr)
+    sys.exit(1)
+except Exception as e:
+    print(f"Error: {e}", file=sys.stderr)
+    sys.exit(1)
