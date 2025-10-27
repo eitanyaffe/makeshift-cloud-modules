@@ -37,9 +37,11 @@ denv_old: validate_env
 
 CONTAINER_NAME:=$(PIPELINE_NAME)-$(PROJECT_NAME)-$(shell bash -c 'echo $$RANDOM')
 denv: validate_env
-	docker run -d -it --name $(CONTAINER_NAME) \
+	docker run -d -it --platform=$(GCP_PLATFORM) --name $(CONTAINER_NAME) \
 	       --cap-add SYS_ADMIN --device /dev/fuse --security-opt apparmor:unconfined \
+	       -v /tmp/.Xauthority-host:/root/.Xauthority:ro \
 	       -v /tmp/.X11-unix:/tmp/.X11-unix \
+	       -e XAUTHORITY=/root/.Xauthority \
 	       -e DISPLAY=host.docker.internal:0 \
 	       -e MAKESHIFT_ROOT=/makeshift \
 	       -e MAKESHIFT_LOCAL_PATH=$(MAKESHIFT_ROOT) \
@@ -49,6 +51,7 @@ denv: validate_env
 	       -v $(MAKESHIFT_CONFIG):/makeshift-config \
 	       -v $(dir $(MAKESHIFT_GCP_KEY)):/keys \
 	       -e GOOGLE_APPLICATION_CREDENTIALS=/keys/$(notdir $(MAKESHIFT_GCP_KEY)) \
+	       -e CLOUDSDK_CONFIG=/makeshift/gcloud-config \
 	       -e SENDGRID_API_KEY=$(PAR_SENDGRID_API_KEY) \
 	       -e PAR_NOTIFY_EMAIL=$(PAR_NOTIFY_EMAIL) \
 	       -e BOTO_CONFIG=/makeshift/.boto \
@@ -76,6 +79,7 @@ denv2:
 	       -v $(MAKESHIFT_CONFIG):/makeshift-config \
 	       -v $(dir $(MAKESHIFT_GCP_KEY)):/keys \
 	       -e GOOGLE_APPLICATION_CREDENTIALS=/keys/$(notdir $(MAKESHIFT_GCP_KEY)) \
+	       -e CLOUDSDK_CONFIG=/makeshift/gcloud-config \
 	       -e SENDGRID_API_KEY=$(PAR_SENDGRID_API_KEY) \
 	       -e PAR_NOTIFY_EMAIL=$(PAR_NOTIFY_EMAIL) \
 	       -e BOTO_CONFIG=/makeshift/.boto \
@@ -199,3 +203,6 @@ ssh:
 
 list:
 	gcloud compute instances list
+
+add_auth:
+	gcloud auth activate-service-account --key-file=/keys/$(GCP_PROJECT_ID).json

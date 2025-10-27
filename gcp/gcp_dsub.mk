@@ -241,39 +241,61 @@ dsub_enable_private_network:
 		--enable-private-ip-google-access
 
 #########################################################################################################
-# check
+# check underlying jobs
+#########################################################################################################
+
+# google jobs
+jobs:
+	gcloud batch jobs list \
+	  --project relman-yaffe \
+	  --filter="status.state!=SUCCEEDED AND status.state!=FAILED"
+
+jobs_wait: 
+	while gcloud batch jobs list \
+		--project=relman-yaffe \
+		--location=us-central1 \
+		--filter="status.state!=SUCCEEDED AND status.state!=FAILED" --format="value(name)" \
+	| grep .; do echo "Waiting for jobs..."; sleep 30; done; echo "✅ All jobs done!"
+
+jobs_all:
+	gcloud batch jobs list \
+	  --project relman-yaffe
+
+#########################################################################################################
+# check dsub tasks
 #########################################################################################################
 
 dstat:
 	dstat \
 		--provider $(GCP_DSUB_PROVIDER) \
 		--project $(GCP_PROJECT_ID) \
-		--users '*' --wait $X
+		--users 'makeshift-user' \
+		--wait
 
 dstat_s:
 	dstat \
 		--provider $(GCP_DSUB_PROVIDER) \
 		--project $(GCP_PROJECT_ID) \
-		--users '*' --wait --summary
+		--users 'makeshift-user' \
+		--summary --wait | grep -v -E 'FAILURE|SUCCESS'
 
 dstat_f:
 	dstat \
 		--provider $(GCP_DSUB_PROVIDER) \
 		--project $(GCP_PROJECT_ID) \
-		--users '*' -f | grep -A 2 'ms-'
+		--users 'makeshift-user' \
+		-f | grep -A 2 'ms-'
 
 ddel_all:
 	ddel \
 		--provider $(GCP_DSUB_PROVIDER) \
 		--project $(GCP_PROJECT_ID) \
-		--users '*' \
 		--jobs $X
 
 ddel:
 	ddel \
 		--provider $(GCP_DSUB_PROVIDER) \
 		--project $(GCP_PROJECT_ID) \
-		--users '*' \
 		--jobs '*' \
 		--label 'ms-job-key-1=$X'
 

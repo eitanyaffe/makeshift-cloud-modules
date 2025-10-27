@@ -89,6 +89,98 @@ should.make=function(wdir, test.command)
 }
 
 ############################################################################################
+# wait for job with resilient polling
+############################################################################################
+
+wait.for.job=function(job.id, project, provider, region, is.batch=FALSE)
+{
+    poll.interval = 30
+    retry.sleep = 10
+    retry.count = 0
+    previous.state = NULL
+    first.poll = TRUE
+    
+    cat(sprintf(">>> waiting for job: %s (batch=%s)\n", job.id, is.batch))
+    
+    while (TRUE) {
+        # use dstat with --summary for both batch and single jobs
+        dstat.command = sprintf("dstat --provider %s --project %s --location %s --jobs '%s' --users 'makeshift-user' --status '*' --summary 2>/dev/null",
+                               provider, project, region, job.id)
+        if (first.poll) {
+            cat(sprintf(">>> running dstat: %s\n", dstat.command))
+            first.poll = FALSE
+        }
+        
+        dstat.output = tryCatch({
+            system(dstat.command, intern=T)
+        }, error = function(e) {
+            return (NULL)
+        })
+        
+        if (is.null(dstat.output) || length(dstat.output) == 0) {
+            retry.count = retry.count + 1
+            cat(sprintf(">>> job not yet visible, retrying in %ds (attempt %d)\n", 
+                       retry.sleep, retry.count))
+            Sys.sleep(retry.sleep)
+            next
+        }
+        
+        # parse dstat summary output
+        # format: "Job Name    Status    Task Count"
+        state = NULL
+        task.count = NULL
+        for (line in dstat.output) {
+            # match on job name (without suffix, e.g., "long-task" or "t-lng-ass")
+            job.name.short = gsub("--makeshift-user.*", "", job.id)
+            if (grepl(job.name.short, line)) {
+                parts = strsplit(line, "\\s+")[[1]]
+                parts = parts[parts != ""]
+                if (length(parts) >= 2) {
+                    state = parts[2]
+                    if (length(parts) >= 3) {
+                        task.count = parts[3]
+                    }
+                    break
+                }
+            }
+        }
+        
+        # reset retry count on success
+        retry.count = 0
+        
+        # check if we got a valid state
+        if (is.null(state) || state == "") {
+            retry.count = retry.count + 1
+            cat(sprintf(">>> could not determine state, retrying in %ds (attempt %d)\n", 
+                       retry.sleep, retry.count))
+            Sys.sleep(retry.sleep)
+            next
+        }
+        
+        # print state only if it changed
+        if (is.null(previous.state) || state != previous.state) {
+            timestamp = format(Sys.time(), "%Y-%m-%d %H:%M:%S")
+            if (!is.null(task.count)) {
+                cat(sprintf(">>> [%s] state: %s (tasks: %s)\n", timestamp, state, task.count))
+            } else {
+                cat(sprintf(">>> [%s] state: %s\n", timestamp, state))
+            }
+            previous.state = state
+        }
+        
+        # check terminal states (dstat uses SUCCESS/FAILURE, gcloud uses SUCCEEDED/FAILED)
+        if (state == "SUCCEEDED" || state == "SUCCESS") {
+            return (0)
+        } else if (state == "FAILED" || state == "FAILURE") {
+            return (1)
+        }
+        
+        # still running, wait and poll again
+        Sys.sleep(poll.interval)
+    }
+}
+
+############################################################################################
 # children cleanup functions
 ############################################################################################
 
@@ -113,10 +205,14 @@ delete.subtree.tasks=function(project, provider, ms.level, job.key)
             command = paste(command, sprintf("--label 'ms-level=%s'", level))
         cat(sprintf(">>> running command: %s\n", command))
         xx = system(command, intern=T, ignore.stderr=T)
-        N = as.numeric(strsplit(xx, " ")[[1]][1])
-        if (is.na(N)) {
-            cat(sprintf(">>> Warning: error parsing ddel result: %s\n", paste(xx, collapse="\n")))
+        if (length(xx) == 0 || xx == "") {
             N = 0
+        } else {
+            N = as.numeric(strsplit(xx, " ")[[1]][1])
+            if (is.na(N)) {
+                cat(sprintf(">>> Warning: error parsing ddel result: %s\n", paste(xx, collapse="\n")))
+                N = 0
+            }
         }
         N
     }
@@ -244,6 +340,7 @@ dsub.base=function(job.work.dir,
         save.job.key.file(ofn=job.key.fn.uniq, ofn.bucket=job.key.bucket.uniq, job.keys)
     }
 
+    # !!! get CLOUDSDK_PYTHON=/usr/bin/python3.9 from command line
     command = paste("dsub",
                     "--enable-stackdriver-monitoring",
                     "--log-interval", log.interval,
@@ -267,8 +364,13 @@ dsub.base=function(job.work.dir,
                     "--logging", logging)
 
     # note: if emails are needed we can't use the private network
-    if (use.private)
+    if (use.private) {
         command = paste(command, "--use-private-address")
+        network = sprintf("https://www.googleapis.com/compute/v1/projects/%s/global/networks/default", project)
+        subnetwork = sprintf("https://www.googleapis.com/compute/v1/projects/%s/regions/%s/subnetworks/default", project, region)
+        command = paste(command, "--network", network)
+        command = paste(command, "--subnetwork", subnetwork)
+    }
 
     # email variables
     command  = paste(command, "--env", paste0("SENDGRID_API_KEY=", sendgrid.key))
@@ -291,9 +393,6 @@ dsub.base=function(job.work.dir,
         stop(cat(sprintf("unknown machine spec style: %s", machine.spec.style)))
     }
     
-    if (wait)
-        command  = paste(command, "--wait")
-
     # add job keys as labels (to allow deletion) and environment variables (to pass on to nested calls)
     for (ii in 1:ms.level) {
         command  = paste(command, sprintf("--label 'ms-job-key-%d=%s'", ii, job.keys[ii]))
@@ -307,7 +406,7 @@ dsub.base=function(job.work.dir,
     if (preemtible.count == 0 && non.preemtible.retry.count > 0)
         command  = paste(command, "--retries", non.preemtible.retry.count)
     
-    list(command=command, job.key.fn=job.key.fn, logging=logging, sendgrid.key=sendgrid.key)
+    list(command=command, job.key.fn=job.key.fn, logging=logging, sendgrid.key=sendgrid.key, region=region, provider=provider, project=project)
 }
 
 format.email.message=function(ll)
@@ -318,6 +417,230 @@ format.email.message=function(ll)
         result = paste0(result, result.i)
     }
     result
+}
+
+delete.job.by.keys=function(job.keys, project, provider)
+{
+    cat(">>> deleting job by key labels (top-down)...\n")
+    for (i in 1:length(job.keys)) {
+        key.label = sprintf("ms-job-key-%d=%s", i, job.keys[i])
+        ddel.command = sprintf("ddel --user makeshift-user --label '%s' --project %s --jobs '*' --provider %s",
+                              key.label, project, provider)
+        cat(sprintf(">>> deleting with label: %s\n", key.label))
+        system(ddel.command)
+    }
+    cat(">>> job deletion by keys completed\n")
+}
+
+dsub.run.with.retries=function(command, job.keys, project, provider, region)
+{
+    command.with.stderr = paste(command, "2>&1")
+    
+    job.rc = tryCatch({
+        dsub.output = system(command.with.stderr, intern=T)
+        job.rc.temp = attr(dsub.output, "status")
+        if (is.null(job.rc.temp)) job.rc.temp = 0
+        
+        for (line in dsub.output)
+            cat(sprintf("%s\n", line))
+        
+        cat(sprintf("dsub call return code: %d\n", job.rc.temp))
+        
+        if (job.rc.temp != 0) {
+            cat(">>> dsub submission or execution failed\n")
+            delete.job.by.keys(job.keys=job.keys, project=project, provider=provider)
+            return(job.rc.temp)
+        }
+        
+        launched.job.id = NULL
+        actual.region = region
+        for (line in dsub.output) {
+            if (grepl("^[a-z0-9_-]+--makeshift-user--[0-9-]+$", line)) {
+                launched.job.id = line
+                cat(sprintf(">>> extracted job-id: %s\n", launched.job.id))
+            }
+            if (grepl("dstat.*--location", line)) {
+                parts = strsplit(line, "\\s+")[[1]]
+                parts = parts[parts != ""]
+                loc.idx = which(parts == "--location")
+                if (length(loc.idx) > 0 && loc.idx < length(parts)) {
+                    actual.region = parts[loc.idx + 1]
+                    cat(sprintf(">>> extracted actual region: %s\n", actual.region))
+                }
+            }
+        }
+        
+        if (!is.null(launched.job.id)) {
+            cat(">>> verifying final job status with dstat...\n")
+            dstat.command = sprintf("dstat --provider %s --project %s --location %s --jobs '%s' --users 'makeshift-user' --status '*' --summary 2>/dev/null",
+                                   provider, project, actual.region, launched.job.id)
+            dstat.output = system(dstat.command, intern=T)
+            
+            state = NULL
+            for (line in dstat.output) {
+                job.name.short = gsub("--makeshift-user.*", "", launched.job.id)
+                if (grepl(job.name.short, line)) {
+                    parts = strsplit(line, "\\s+")[[1]]
+                    parts = parts[parts != ""]
+                    if (length(parts) >= 2) {
+                        state = parts[2]
+                        break
+                    }
+                }
+            }
+            
+            cat(sprintf(">>> final job state: %s\n", state))
+            if (state == "SUCCESS" || state == "SUCCEEDED") {
+                job.rc.temp = 0
+            } else if (state == "FAILURE" || state == "FAILED") {
+                job.rc.temp = 1
+            } else {
+                cat(sprintf(">>> warning: unexpected final state: %s\n", state))
+                job.rc.temp = 1
+            }
+        }
+        
+        job.rc.temp
+    }, interrupt = function(e) {
+        cat("\n>>> interrupt detected (Ctrl-C), waiting 3 seconds before deleting job...\n")
+        Sys.sleep(3)
+        delete.job.by.keys(job.keys=job.keys, project=project, provider=provider)
+        stop("job cancelled by user")
+    })
+    
+    job.rc
+}
+
+dsub.run.custom.monitoring=function(command, job.keys, project, provider, region, ms.level, wait)
+{
+    command.with.stderr = paste(command, "2>&1")
+    dsub.output = system(command.with.stderr, intern=T)
+    job.rc = attr(dsub.output, "status")
+    if (is.null(job.rc))
+        job.rc = 0
+    
+    for (line in dsub.output)
+        cat(sprintf("%s\n", line))
+    
+    cat(sprintf("dsub call return code: %d\n", job.rc))
+    
+    launched.job.id = NULL
+    actual.region = region
+    is.batch.job = FALSE
+    if (job.rc == 0) {
+        for (line in dsub.output) {
+            if (grepl("^[a-z0-9_-]+--makeshift-user--[0-9-]+$", line)) {
+                launched.job.id = line
+                cat(sprintf(">>> parsed line for job-id: '%s'\n", line))
+                cat(sprintf(">>> extracted job-id: %s\n", launched.job.id))
+            }
+            if (grepl("task\\(s\\)", line)) {
+                is.batch.job = TRUE
+                cat(sprintf(">>> detected batch job from line: '%s'\n", line))
+            }
+            if (grepl("dstat.*--location", line)) {
+                parts = strsplit(line, "\\s+")[[1]]
+                parts = parts[parts != ""]
+                loc.idx = which(parts == "--location")
+                if (length(loc.idx) > 0 && loc.idx < length(parts)) {
+                    actual.region = parts[loc.idx + 1]
+                    cat(sprintf(">>> extracted actual region: %s\n", actual.region))
+                }
+            }
+        }
+        if (wait && is.null(launched.job.id)) {
+            cat(">>> error: failed to extract job-id from dsub output, cannot wait for job\n")
+            cat(">>> the job was submitted but we cannot track it\n")
+            cat(">>> to see all running jobs: make m=gcp dstat_s\n")
+            cat(">>> to delete a specific job: make m=gcp ddel X=<job-id>\n")
+            if (ms.level == 1) {
+                cat(sprintf(">>> to delete by run key: make m=gcp ddel X=%s\n", job.keys[1]))
+            }
+            stop("critical error: cannot extract job-id for wait operation")
+        }
+    }
+    
+    if (job.rc == 0 && wait && !is.null(launched.job.id)) {
+        cat(">>> waiting for job to register in system...\n")
+        Sys.sleep(5)
+        
+        cat(sprintf(">>> using base job-id for monitoring: %s\n", launched.job.id))
+        
+        cat(sprintf(">>> useful gcloud commands for manual debugging:\n"))
+        cat(sprintf(">>> list jobs: gcloud batch jobs list --project %s --filter='name~%s'\n", 
+                   project, launched.job.id))
+        
+        job.rc = tryCatch({
+            wait.for.job(job.id=launched.job.id, project=project, provider=provider, region=actual.region, is.batch=is.batch.job)
+        }, interrupt = function(e) {
+            cat("\n>>> interrupt detected (Ctrl-C), waiting 3 seconds before deleting job...\n")
+            Sys.sleep(3)
+            
+            ddel.command = sprintf("ddel --user makeshift-user --provider %s --project %s --jobs '%s'",
+                                  provider, project, launched.job.id)
+            cat(sprintf(">>> deleting job: %s\n", ddel.command))
+            system(ddel.command)
+            
+            cat(">>> job deletion initiated\n")
+            stop("job cancelled by user")
+        })
+        cat(sprintf("wait.for.job return code: %d\n", job.rc))
+    }
+    
+    job.rc
+}
+
+send.job.completion.email=function(send.email.flag, email, sendgrid.key, wait, job.rc, ms.level, 
+                                    max.report.level, job.id, ms.title, job.keys, project.name, 
+                                    ms.type, ms.desc, logging)
+{
+    should.send.email = send.email.flag && email != "NONE" && sendgrid.key != "NONE" && wait
+    should.send.email = should.send.email && (job.rc != 0 || ms.level <= max.report.level)
+    
+    if (!should.send.email)
+        return()
+    
+    email.subject = sprintf("MS: %s/%d/%s: %s", job.id, ms.level, ms.title, if (job.rc == 0) "done" else "error")
+    labels = paste0("<br>", 1:ms.level, ") ms-job-key-", 1:ms.level, "=", job.keys, collapse=" ")
+    email.ll = list(Sender="Makeshift_pipeline_messenger", Project=project.name, Job_type=ms.type, 
+                    Level=ms.level, Command=paste(ms.desc, collapse=" "), Return_code=job.rc, 
+                    Logs=logging, Labels=labels)
+    email.message = format.email.message(email.ll)
+    
+    fns = system(sprintf("gsutil -mq ls %s*.log", gsub(".log", "", logging)), intern=T)
+    
+    if (length(fns) > 20)
+        fns = fns[1:20]
+    
+    system("rm -rf /tmp/ms_logs && mkdir -p /tmp/ms_logs")
+    cat(sprintf("attaching to email log files: %s\n", paste(fns, collapse=" ")))
+    attachments = NULL
+    for (fn in fns) {
+        tfn = paste0("/tmp/ms_logs/", basename(fn))
+        exec(sprintf("gsutil -mq cat %s | grep -v 'INFO: gsutil -h Content-Type:text/plain' | grep -v 'Starting a garbage collection run' | grep -v 'Garbage collection succeeded after' > %s",
+                     fn, tfn), ignore.error=T)
+        if (file.info(tfn)$size > 0)
+            attachments = c(attachments, tfn)
+    }
+    if (length(fns) > 12) {
+        exec(sprintf("tar cvf /tmp/ms_logs.tar -C /tmp/ms_logs ."))
+        attachments = "/tmp/ms_logs.tar"
+    }
+    rc = 1
+    count = 1
+    while (rc && count <= 4) { 
+        rc = send.email(sendgrid.key=sendgrid.key,
+                        from.email=email,
+                        to.email=email,
+                        subject=email.subject,
+                        message=email.message,
+                        attachments=attachments)
+        if (rc) {
+            system("sleep 30s")
+            count = count + 1
+            if (count == 4) attachments = NULL
+        }
+    }
 }
 
 verify.final.file=function(out.paths, job.key)
@@ -354,10 +677,17 @@ verify.final.file=function(out.paths, job.key)
     rc
 }
 
-dsub.run=function(command, dry, wait, project, provider, job.keys, ms.level, log.basedir, job.id, 
+dsub.run=function(command, dry, wait, project, provider, region, job.keys, ms.level, log.basedir, job.id, 
                   project.name, ms.type, ms.title, ms.desc, logging, email, max.report.level,
                   send.email.flag, sendgrid.key, out.paths)
 {
+    has.retries = grepl("--retries", command)
+    
+    if (has.retries && wait) {
+        command = paste(command, "--wait")
+        cat(">>> using dsub built-in --wait (required for --retries)\n")
+    }
+    
     cat(paste0(">>> DSUB: running dsub command: \n", gsub("--", '\\\\\n\t--', command), "\n"))
     if (dry) stop("dry run")
     
@@ -373,77 +703,36 @@ dsub.run=function(command, dry, wait, project, provider, job.keys, ms.level, log
             cat(sprintf("Waiting for job to finish. Hit Ctrl-C to terminate the job.\n"))
             cat(sprintf("Open a new terminal to run the following commands.\n"))
         }
-        cat(sprintf("1. To delete job:\n%% make m=gcp ddel X=%s\n", job.keys[1]))
+        cat(sprintf("1. To delete job:\nmake m=gcp ddel X=%s\n", job.keys[1]))
         cat(sprintf("2. To download logs (wait until done for complete logs):\n"))
-        cat(sprintf("%% make m=gcp gcp_logs_download_key RUN_KEY=%s\n", job.keys[1]))
+        cat(sprintf("make m=gcp gcp_logs_download_key RUN_KEY=%s\n", job.keys[1]))
         cat(sprintf("3. To see status of all running jobs:\n"))
-        cat(sprintf("%% make m=gcp dstat_s\n"))
+        cat(sprintf("make m=gcp dstat_s\n"))
         cat(paste0("======================================================================================\n"))
     }
     
-    job.rc = system(command)
-    cat(sprintf("dsub call return code: %d\n", job.rc))
-
+    if (has.retries && wait) {
+        job.rc = dsub.run.with.retries(command=command, job.keys=job.keys, project=project, 
+                                        provider=provider, region=region)
+    } else {
+        job.rc = dsub.run.custom.monitoring(command=command, job.keys=job.keys, project=project, 
+                                             provider=provider, region=region, ms.level=ms.level, wait=wait)
+    }
+    
     # verify the stamp file was created
     if (job.rc == 0 && wait) {
         job.rc = verify.final.file(out.paths=out.paths, job.key=job.keys[length(job.keys)])
     }
     
     if (job.rc != 0) {
-        # remove entire subtree of current task with single delete command
         N = length(job.keys)
         delete.subtree.tasks(job.key=job.keys[N], project=project, provider=provider, ms.level=ms.level)
     }
 
-    should.send.email = send.email.flag && email != "NONE" && sendgrid.key != "NONE" && wait
-    
-    # should.send.email = should.send.email && (ms.level <= max.report.level)
-    should.send.email = should.send.email && (job.rc != 0 || ms.level <= max.report.level)
-    
-    if (should.send.email) {
-        email.subject = sprintf("MS: %s/%d/%s: %s", job.id, ms.level, ms.title, if (job.rc == 0) "done" else "error")
-        labels = paste0("<br>", 1:ms.level, ") ms-job-key-", 1:ms.level, "=", job.keys, collapse=" ")
-        email.ll = list(Sender="Makeshift_pipeline_messenger", Project=project.name, Job_type=ms.type, Level=ms.level, Command=paste(ms.desc, collapse=" "), Return_code=job.rc, Logs=logging, Labels=labels)
-        email.message = format.email.message(email.ll)
-        
-        # get logs
-        fns = system(sprintf("gsutil -mq ls %s*.log", gsub(".log", "", logging)), intern=T)
-            
-        # do not send too many log files
-        if (length(fns) > 20)
-            fns = fns[1:20]
-        
-        system("rm -rf /tmp/ms_logs && mkdir -p /tmp/ms_logs")
-        cat(sprintf("attaching to email log files: %s\n", paste(fns, collapse=" ")))
-        attachments = NULL
-        for (fn in fns) {
-            tfn = paste0("/tmp/ms_logs/", basename(fn))
-            exec(sprintf("gsutil -mq cat %s | grep -v 'INFO: gsutil -h Content-Type:text/plain' | grep -v 'Starting a garbage collection run' | grep -v 'Garbage collection succeeded after' > %s",
-                         fn, tfn), ignore.error=T)
-            if (file.info(tfn)$size > 0)
-                attachments = c(attachments, tfn)
-        }
-        if (length(fns) > 12) {
-            exec(sprintf("tar cvf /tmp/ms_logs.tar -C /tmp/ms_logs ."))
-            attachments = "/tmp/ms_logs.tar"
-            
-        }
-        rc = 1
-        count = 1
-        while (rc && count <= 4) { 
-            rc = send.email(sendgrid.key=sendgrid.key,
-                            from.email=email,
-                                to.email=email,
-                            subject=email.subject,
-                            message=email.message,
-                            attachments=attachments)
-            if (rc) {
-                system("sleep 30s")
-                count = count + 1
-                if (count == 4) attachments = NULL
-            }
-        }
-    }
+    send.job.completion.email(send.email.flag=send.email.flag, email=email, sendgrid.key=sendgrid.key,
+                               wait=wait, job.rc=job.rc, ms.level=ms.level, max.report.level=max.report.level,
+                               job.id=job.id, ms.title=ms.title, job.keys=job.keys, project.name=project.name,
+                               ms.type=ms.type, ms.desc=ms.desc, logging=logging)
 
     if (job.rc != 0)
         stop("dsub error")
@@ -598,7 +887,7 @@ dsub.ms=function(job.work.dir,
                           " --mount ", mount.bucket.vars[i], "=", mount.buckets[i])
     
     dsub.run(command=command, dry=dry, wait=wait, 
-             project=project, provider=provider,
+             project=project, provider=provider, region=dbase$region,
              job.keys=job.keys, ms.level=ms.level, log.basedir=log.basedir,
              project.name=project.name, max.report.level=max.report.level, job.id=job.id,
              ms.title=name, ms.type="single", ms.desc=make.base, logging=dbase$logging, email=email,
@@ -777,6 +1066,7 @@ dsub.ms.tasks=function(job.work.dir,
     if (download.intermediates)
         make.command = paste0("make m=gcp dsub_update_local && ")
     make.base = paste0("make ", target, " ", task.params, " ", params.str)
+
     make.command = paste0(make.command, make.base)
 
     # check free space at end of command
@@ -810,7 +1100,7 @@ dsub.ms.tasks=function(job.work.dir,
                           " --mount ", mount.bucket.vars[i], "=", mount.buckets[i])
 
     dsub.run(command=command, dry=dry, wait=wait,
-             project=project, provider=provider,
+             project=project, provider=provider, region=dbase$region,
              job.keys=job.keys, ms.level=ms.level, log.basedir=log.basedir,
              project.name=project.name, max.report.level=max.report.level, job.id=job.id,
              ms.title=name, ms.type="tasks_simple", ms.desc=make.base, logging=dbase$logging, email=email,
@@ -990,6 +1280,7 @@ dsub.ms.complex=function(job.work.dir,
     if (download.intermediates)
         make.command = paste0("make m=gcp dsub_update_local && ")
     make.base = paste0("make ", target, " ", task.params, " ", params.str)
+
     make.command = paste0(make.command, make.base)
 
     # check free space at end of command
@@ -1023,7 +1314,7 @@ dsub.ms.complex=function(job.work.dir,
                           " --mount ", mount.bucket.vars[i], "=", mount.buckets[i])
 
     dsub.run(command=command, dry=dry, wait=wait,
-             project=project, provider=provider,
+             project=project, provider=provider, region=dbase$region,
              job.keys=job.keys, ms.level=ms.level, log.basedir=log.basedir,
              project.name=project.name, max.report.level=max.report.level, job.id=job.id,
              ms.title=name, ms.type="tasks_complex", ms.desc=make.base, logging=dbase$logging, email=email,
@@ -1181,9 +1472,13 @@ dsub.direct=function(job.work.dir,
 
     dsub.command  = paste0(dsub.command,
                            " --input-recursive ", paste0("MAKESHIFT_ROOT=", ms.root))
-    
+
+    # !!! make this a parameter
+    # dsub.command = paste(dsub.command, "--accelerator-type nvidia-tesla-t4 --accelerator-count 1")
+    # dsub.command = paste(dsub.command, "--accelerator-type nvidia-h100-80gb --accelerator-count 1")
+
     dsub.run(command=dsub.command, dry=dry, wait=wait, 
-             project=project, provider=provider,
+             project=project, provider=provider, region=dbase$region,
              job.keys=job.keys, ms.level=ms.level, log.basedir=log.basedir,
              project.name=project.name, max.report.level=max.report.level, job.id=job.id,
              ms.title=name, ms.type="direct", ms.desc=command, logging=dbase$logging, email=email,

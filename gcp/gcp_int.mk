@@ -44,15 +44,20 @@ GCP_LOCATION?=us-west1
 # mdocker image
 ###############################################################################################
 
-GCP_IMAGE_NAME=mdocker-metagenomics
-GCP_GCR_HOSTNAME=gcr.io
+GCP_IMAGE_BASE?=mdocker-metagenomics
+GCP_UBUNTU_VER?=22.04
+GCP_PLATFORM?=linux/amd64
+
+GCP_IMAGE_NAME?=$(GCP_IMAGE_BASE)-$(GCP_UBUNTU_VER)
+GCP_GCR_HOSTNAME?=gcr.io
 GCP_GCR_IMAGE_PATH?=$(GCP_GCR_HOSTNAME)/$(GCP_PROJECT_ID)/$(GCP_IMAGE_NAME)
 
 GCP_DOCKERHUB_BASE?=eitanyaffe
 GCP_DOCKERHUB_IMAGE_VER?=v1.00
 GCP_DOCKERHUB_IMAGE?=$(GCP_DOCKERHUB_BASE)/$(GCP_IMAGE_NAME):$(GCP_DOCKERHUB_IMAGE_VER)
 
-GCP_DSUB_PROVIDER?=google-cls-v2
+# GCP_DSUB_PROVIDER?=google-cls-v2
+GCP_DSUB_PROVIDER?=google-batch
 
 ###############################################################################################
 # basic input/output dirs

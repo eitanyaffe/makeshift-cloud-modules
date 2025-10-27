@@ -34,8 +34,9 @@ get.sub.logs=function(log.path)
         return (NULL)
     }
 
-    rr = gsub(" \\\\", "", gsub("\t--logging ", "", rr))
-    rr
+    regmatches(rr, regexpr("gs://[^ ]+", rr))
+
+    # gsub(" \\\\", "", gsub("\t--logging ", "", rr))
 }
 
 localize.log=function(fn, out.bucket, odir)

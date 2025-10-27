@@ -2,6 +2,8 @@
 # build image
 mdocker:
 	docker build \
+		--platform $(GCP_PLATFORM) \
+		--load \
 		-t $(GCP_IMAGE_NAME) \
 		-f $(_md)/containers/$(GCP_IMAGE_NAME)/Dockerfile \
 		$(_md)/containers/$(GCP_IMAGE_NAME)
