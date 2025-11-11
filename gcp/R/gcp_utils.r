@@ -68,3 +68,15 @@ compress.find=function(base.mount, out.bucket, base.dir, name.pattern)
         }
     }
 }
+
+###############################################################################################
+# copy from bucket
+###############################################################################################
+
+copy.from.bucket=function(base.mount, out.bucket, source.path, dest.path)
+{
+    source.bucket = path2bucket(path=source.path, out.bucket=out.bucket, base.mount=base.mount)
+    cmd = sprintf("gsutil cp %s %s", source.bucket, dest.path)
+    cat(sprintf("running: %s\n", cmd))
+    system(cmd)
+}

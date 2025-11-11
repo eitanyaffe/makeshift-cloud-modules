@@ -123,7 +123,7 @@ PAR_REMOVE_BUCKET?=bucket_of_some_files
 PAR_PREEMTIBLE?=1
 
 # number of retries beyond preemtible
-PAR_NON_PREEMTIBLE_RETRIES?=0
+PAR_NON_PREEMTIBLE?=0
 
 # rsync from bucket before starting target 
 PAR_DOWNLOAD_INTERMEDIATES?=T

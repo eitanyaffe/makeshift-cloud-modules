@@ -118,6 +118,16 @@ gcp_compress:
 	       base.dir=$(GCP_COMPRESS_DIR) \
 	       name.pattern=$(GCP_COMPRESS_NAME_PATTERN)
 
+###############################################################################################
+# copy from bucket
+###############################################################################################
+
+gcp_copy_from_bucket:
+	$(_R) $(_md)/R/gcp_utils.r copy.from.bucket \
+	       base.mount=$(GCP_DSUB_ODIR_BUCKET_BASE) \
+	       out.bucket=$(GCP_DSUB_ODIR_BUCKET) \
+	       source.path=$(GCP_COPY_SOURCE) \
+	       dest.path=$(GCP_COPY_DEST)
 
 ###############################################################################################
 # bucket disk usage

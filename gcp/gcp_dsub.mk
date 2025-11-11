@@ -51,7 +51,7 @@ dsub:
 	       idir.buckets="$(GCP_DSUB_IDIR_BUCKETS)" \
 	       idir.basedirs="$(GCP_DSUB_IDIR_BASEDIRS)" \
 	       preemtible.count=$(GCP_DSUB_PREEMTIBLE) \
-	       non.preemtible.retry.count=$(PAR_NON_PREEMTIBLE_RETRIES) \
+	       non.preemtible.retry.count=$(PAR_NON_PREEMTIBLE) \
 	       log.interval=$(GCP_DSUB_LOG_INTERVAL) \
 	       dry=$(DRY) \
 	       wait=$(GCP_DSUB_WAIT) \
@@ -105,7 +105,7 @@ dsub_tasks:
 	       task.item.vals="$(GCP_DSUB_TASK_ITEM_VALS)" \
 	       batch.size=$(GCP_BATCH_SIZE) \
 	       preemtible.count=$(GCP_DSUB_PREEMTIBLE) \
-	       non.preemtible.retry.count=$(PAR_NON_PREEMTIBLE_RETRIES) \
+	       non.preemtible.retry.count=$(PAR_NON_PREEMTIBLE) \
 	       dry=$(DRY) \
 	       wait=$(GCP_DSUB_WAIT) \
 	       log.basedir=$(GCP_LOG_BASEDIR) \
@@ -159,7 +159,7 @@ dsub_tasks_complex:
 	       task.odir.vals=$(DSUB_TASK_ITEM_ODIR) \
 	       batch.size=$(GCP_BATCH_SIZE) \
 	       preemtible.count=$(GCP_DSUB_PREEMTIBLE) \
-	       non.preemtible.retry.count=$(PAR_NON_PREEMTIBLE_RETRIES) \
+	       non.preemtible.retry.count=$(PAR_NON_PREEMTIBLE) \
 	       dry=$(DRY) \
 	       wait=$(GCP_DSUB_WAIT) \
 	       log.basedir=$(GCP_LOG_BASEDIR) \
@@ -197,7 +197,7 @@ dsub_direct:
 	       project.name=$(GCP_MS_PROJECT_NAME) \
 	       credentials.file=$(GCP_KEY_FILE) \
 	       preemtible.count=$(GCP_DSUB_PREEMTIBLE) \
-	       non.preemtible.retry.count=$(PAR_NON_PREEMTIBLE_RETRIES) \
+	       non.preemtible.retry.count=$(GCP_DSUB_NON_PREEMTIBLE) \
 	       dry=$(DRY) \
 	       wait=$(GCP_DSUB_WAIT) \
 	       log.basedir=$(GCP_LOG_BASEDIR) \
@@ -273,11 +273,14 @@ dstat:
 		--wait
 
 dstat_s:
-	dstat \
-		--provider $(GCP_DSUB_PROVIDER) \
-		--project $(GCP_PROJECT_ID) \
-		--users 'makeshift-user' \
-		--summary --wait | grep -v -E 'FAILURE|SUCCESS'
+	while true; do \
+		dstat \
+			--provider $(GCP_DSUB_PROVIDER) \
+			--project $(GCP_PROJECT_ID) \
+			--users 'makeshift-user' \
+			--summary | grep -v -E 'FAILURE|SUCCESS'; \
+		sleep 2; \
+	done
 
 dstat_f:
 	dstat \
@@ -290,13 +293,15 @@ ddel_all:
 	ddel \
 		--provider $(GCP_DSUB_PROVIDER) \
 		--project $(GCP_PROJECT_ID) \
-		--jobs $X
+		--jobs '*'  \
+		--users 'makeshift-user'
 
 ddel:
 	ddel \
 		--provider $(GCP_DSUB_PROVIDER) \
 		--project $(GCP_PROJECT_ID) \
 		--jobs '*' \
+		--users 'makeshift-user' \
 		--label 'ms-job-key-1=$X'
 
 #########################################################################################################
