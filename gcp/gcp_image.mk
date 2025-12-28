@@ -1,5 +1,6 @@
 
 # build image
+# add  --progress=plain to disable log folding in terminal
 mdocker:
 	docker build \
 		--platform $(GCP_PLATFORM) \

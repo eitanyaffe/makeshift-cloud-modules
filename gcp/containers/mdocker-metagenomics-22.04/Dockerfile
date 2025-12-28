@@ -411,7 +411,40 @@ RUN apt-get update && apt-get install --no-install-recommends -y lftp
 RUN apt-get -y install libgnutls28-dev
 RUN $VENV_PIP install Bio
 RUN $VENV_PIP install mob_suite
-    
+
+#############################################################################################
+# kmer-db
+#############################################################################################
+
+RUN mkdir -p /usr/local/kmer-db && \
+    cd /usr/local/kmer-db && \
+    wget https://github.com/refresh-bio/kmer-db/releases/download/v2.3.1/kmer-db-v2.3.1-x64_linux.tar.gz && \
+    tar xvf kmer-db-v2.3.1-x64_linux.tar.gz && \
+    rm kmer-db-v2.3.1-x64_linux.tar.gz && \
+    chmod +x kmer-db
+
+ENV PATH=$PATH:/usr/local/kmer-db
+
+RUN $VENV_PIP install networkx
+
+#############################################################################################
+# R packages for evo module plotting
+#############################################################################################
+
+# for phylogenetic tree plotting (evo module)
+RUN R -e "install.packages(c('ape', 'ggplot2', 'dplyr', 'tidyr', 'gridExtra'))"
+RUN R -e "BiocManager::install(c('ggtree', 'ggtreeExtra'), ask=F)"
+
+RUN R -e "install.packages(c('htmlwidgets'))"
+
+RUN apt-get update && apt-get install --no-install-recommends -y \
+    libssl-dev \
+    pkg-config \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+RUN R -q -e 'install.packages("plotly", repos="https://cloud.r-project.org"); \
+    stopifnot(requireNamespace("plotly", quietly=TRUE))'
+
 #############################################################################################
 # aliases
 #############################################################################################
