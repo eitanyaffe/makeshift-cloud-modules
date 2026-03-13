@@ -361,6 +361,14 @@ RUN git clone https://github.com/tseemann/barrnap.git /opt/barrnap \
     && ln -s /opt/barrnap/bin/barrnap /usr/local/bin/barrnap
 
 #############################################################################################
+# myloasm
+#############################################################################################
+
+RUN wget https://github.com/bluenote-1577/myloasm/releases/download/v0.4.0/myloasm-0.4.0-x86_64-avx2 && \
+    chmod +x myloasm-0.4.0-x86_64-avx2 && \
+    mv myloasm-0.4.0-x86_64-avx2 /usr/local/bin/myloasm
+    
+#############################################################################################
 # R packages
 #############################################################################################
 
@@ -444,6 +452,32 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
 
 RUN R -q -e 'install.packages("plotly", repos="https://cloud.r-project.org"); \
     stopifnot(requireNamespace("plotly", quietly=TRUE))'
+
+#############################################################################################
+# mafft
+#############################################################################################
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends mafft && \
+    rm -rf /var/lib/apt/lists/*
+
+#############################################################################################
+# hifiasm-meta
+#############################################################################################
+
+RUN git clone https://github.com/xfengnefx/hifiasm-meta.git && \
+    cd hifiasm-meta && make && \
+    cp hifiasm_meta /usr/local/bin/
+
+#############################################################################################
+# bracken
+#############################################################################################
+
+RUN git clone https://github.com/jenniferlu717/Bracken.git /opt/bracken && \
+    cd /opt/bracken/src && \
+    make
+
+ENV PATH=$PATH:/opt/bracken
 
 #############################################################################################
 # aliases
