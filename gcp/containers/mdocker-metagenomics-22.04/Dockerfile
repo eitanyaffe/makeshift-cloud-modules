@@ -81,8 +81,9 @@ ENV PATH="$VENV_DIR/bin:$PATH"
 # gsutil and gcloud
 #############################################################################################
 
-# Downloading gcloud package
-RUN curl https://dl.google.com/dl/cloudsdk/release/google-cloud-sdk.tar.gz > \
+# pinned: the un-versioned google-cloud-sdk.tar.gz url is a rolling pointer
+ENV GCLOUD_SDK_VER=530.0.0
+RUN curl https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-${GCLOUD_SDK_VER}-linux-x86_64.tar.gz > \
     	 /tmp/google-cloud-sdk.tar.gz \
     && mkdir -p /usr/local/gcloud \
     && tar -C /usr/local/gcloud -xvf /tmp/google-cloud-sdk.tar.gz \
@@ -93,7 +94,7 @@ RUN curl https://dl.google.com/dl/cloudsdk/release/google-cloud-sdk.tar.gz > \
 ENV PATH=$PATH:/usr/local/gcloud/google-cloud-sdk/bin
 
 # Install crcmod in venv
-RUN $VENV_PIP install --no-cache-dir -U crcmod
+RUN $VENV_PIP install --no-cache-dir crcmod==1.7
 
 # gcloud
 RUN gcloud config set component_manager/disable_update_check true
@@ -102,7 +103,7 @@ RUN gcloud config set component_manager/disable_update_check true
 # g++, gnumake
 #############################################################################################
 
-RUN apt-get install --no-install-recommends -y build-essential libgsl0-dev && \
+RUN apt-get update && apt-get install --no-install-recommends -y build-essential libgsl0-dev && \
     apt-get clean all
 
 #############################################################################################
@@ -134,10 +135,10 @@ RUN curl -L -O https://github.com/GoogleCloudPlatform/gcsfuse/releases/download/
 #############################################################################################
 
 # Install google-cloud-batch in venv
-RUN $VENV_PIP install google-cloud-batch
+RUN $VENV_PIP install google-cloud-batch==0.17.20
 
-# Clone dsub and install in venv
-RUN git clone https://github.com/DataBiosphere/dsub /dsub && \
+# Clone dsub and install in venv (pinned to tag v0.5.0)
+RUN git clone --branch v0.5.0 --single-branch https://github.com/DataBiosphere/dsub /dsub && \
     cd /dsub && $VENV_PIP install .
 
 #############################################################################################
@@ -165,10 +166,22 @@ RUN apt-get install --no-install-recommends -y bwa samtools && \
     apt-get clean all
 
 #############################################################################################
-# sendgrid / khmer / sourmash
+# sendgrid / sourmash
 #############################################################################################
 
-RUN $VENV_PIP install sendgrid khmer sourmash
+# khmer dropped 2026-04-20: upstream (dib-lab/khmer) archived 2019; sdist 2.1.1's
+# ez_setup.py bootstrap tries to fetch setuptools from a retired pypi.python.org
+# path and fails to build on modern pip.
+#
+# PIP_CONSTRAINT pins setuptools<81 in pip's isolated build env, for screed 1.1.3
+# (pulled in as a sourmash dep, no wheel). screed's build imports pkg_resources
+# via an older setuptools_scm; setuptools 81 removed pkg_resources.
+# sourmash>=4.9 and screed>=1.2 both require python>=3.11, so they're out of
+# reach on ubuntu 22.04 (python 3.10) — the current pins are already the latest
+# versions compatible with this image.
+RUN echo 'setuptools<81' > /tmp/pip-build.cons && \
+    PIP_CONSTRAINT=/tmp/pip-build.cons $VENV_PIP install sendgrid==6.12.4 sourmash==4.8.14 && \
+    rm /tmp/pip-build.cons
 
 #############################################################################################
 # diamond
@@ -183,7 +196,7 @@ RUN mkdir -p /usr/local/diamond && \
 # sra-tools
 #############################################################################################
 
-ARG SRATOOLS_VERSION=current
+ARG SRATOOLS_VERSION=3.2.0
 RUN apt-get update && apt-get --quiet install --yes curl uuid-runtime && apt-get clean all
 RUN curl https://ftp-trace.ncbi.nlm.nih.gov/sra/sdk/${SRATOOLS_VERSION}/sratoolkit.${SRATOOLS_VERSION}-centos_linux64-cloud.tar.gz | tar xz -C /
 ENV PATH=/usr/local/ncbi/sra-tools/bin:${PATH}
@@ -217,8 +230,11 @@ ENV PATH=/opt/cd-hit:/opt/cd-hit/cd-hit-auxtools:/opt/cd-hit/psi-cd-hit:/opt/ncb
 # MMSeqs2
 #############################################################################################
 
+# avx2 binary: works on linux/amd64 GCP VMs; fails with "Illegal instruction" on arm64 emulation (apple silicon)
+# pinned: github release tag (mmseqs.com/latest is a rolling master build)
+ENV MMSEQS_VER=18-8cc5c
 RUN cd /usr/local && \
-    wget https://mmseqs.com/latest/mmseqs-linux-avx2.tar.gz && \
+    wget https://github.com/soedinglab/MMseqs2/releases/download/${MMSEQS_VER}/mmseqs-linux-avx2.tar.gz && \
     tar xvfz mmseqs-linux-avx2.tar.gz && \
     rm -rf mmseqs-linux-avx2.tar.gz
 ENV PATH=$PATH:/usr/local/mmseqs/bin
@@ -228,25 +244,28 @@ ENV PATH=$PATH:/usr/local/mmseqs/bin
 #############################################################################################
 
 RUN mkdir /eggNOG && cd /eggNOG && \
-    wget --no-check-certificate https://github.com/eggnogdb/eggnog-mapper/archive/refs/tags/2.1.7.tar.gz && \
-    tar xvfz 2.1.7.tar.gz && \
-    rm -rf 2.1.7.tar.gz && cd eggnog-mapper-2.1.7 && \
+    wget --no-check-certificate https://github.com/eggnogdb/eggnog-mapper/archive/refs/tags/2.1.13.tar.gz && \
+    tar xvfz 2.1.13.tar.gz && \
+    rm -rf 2.1.13.tar.gz && cd eggnog-mapper-2.1.13 && \
+    sed -i 's|http://eggnogdb\.embl\.de/download|http://eggnog5.embl.de/download|g' download_eggnog_data.py && \
     $VENV_PIP install -r requirements.txt
 
 #############################################################################################
 # clustal
 #############################################################################################
 
-RUN wget http://www.clustal.org/omega/clustalo-1.2.4-Ubuntu-x86_64 && \
-    mv clustalo-1.2.4-Ubuntu-x86_64 /usr/local/bin && \
-    chmod a+x /usr/local/bin/clustalo-1.2.4-Ubuntu-x86_64
+# clustal.org direct download 403s via cloudflare (2026-04-20); apt ships the same 1.2.4 upstream
+RUN apt-get update && \
+    apt-get install --no-install-recommends -y clustalo && \
+    apt-get clean all
 
 #############################################################################################
 # StrainFinder (Python 2, pinned)
 #############################################################################################
 
-# Clone StrainFinder
+# Clone StrainFinder (pinned to commit 745a20a; repo has no release tags)
 RUN git clone https://github.com/cssmillie/StrainFinder.git /StrainFinder && \
+    cd /StrainFinder && git checkout 745a20a && cd / && \
     apt-get update && \
     apt-get install -y python2 python2-dev && \
     curl https://bootstrap.pypa.io/pip/2.7/get-pip.py --output get-pip.py && \
@@ -268,7 +287,7 @@ RUN pip2 install \
 # Pandas
 #############################################################################################
 
-RUN $VENV_PIP install pandas
+RUN $VENV_PIP install pandas==1.5.3
 
 #############################################################################################
 # GTDB-TK
@@ -303,33 +322,38 @@ RUN wget https://github.com/ParBLiSS/FastANI/releases/download/v1.33/fastANI-Lin
     unzip fastANI-Linux64-v1.33.zip -d /usr/bin && \
     rm fastANI-Linux64-v1.33.zip
 
-# SKANI
+# SKANI (unpinnable: upstream publishes the precompiled binary only on the rolling
+# "latest" github release; versioned tags (v0.3.1, v0.3.0, ...) carry no assets.
+# reported version will drift between builds; details.txt captures what landed.
+# real pinning would require `cargo install --tag vX.Y.Z` + the rust toolchain.)
 RUN wget https://github.com/bluenote-1577/skani/releases/latest/download/skani \
     && chmod +x skani \
     && mv skani /usr/local/bin/
 
 # GTDB-TK
-RUN $VENV_PIP install gtdbtk
+RUN $VENV_PIP install gtdbtk==2.4.1
 
 #############################################################################################
 # CheckM
 #############################################################################################
 
-RUN $VENV_PIP install numpy matplotlib pysam checkm-genome
+RUN $VENV_PIP install numpy==1.23.4 matplotlib==3.10.3 pysam==0.23.3 checkm-genome==1.2.4
 
 #############################################################################################
 # XML::Parser for parsing GOA_UNIPROT_TABLE
 #############################################################################################
 
-RUN cpanm install XML::Parser
+RUN cpanm install XML::Parser@2.47
 
 #############################################################################################
 # metaMDBG
 #############################################################################################
 
 RUN apt-get update && apt-get -y install cmake
+# pinned: default branch drifted and broke the linker; tag metaMDBG-1.2 is the v1.00 baseline
+ENV METAMDBG_VER=metaMDBG-1.2
 RUN mkdir -p /usr/local/metaMDBG && \
-    git clone https://github.com/GaetanBenoitDev/metaMDBG.git /usr/local/metaMDBG && \
+    git clone --branch ${METAMDBG_VER} --single-branch https://github.com/GaetanBenoitDev/metaMDBG.git /usr/local/metaMDBG && \
     cd /usr/local/metaMDBG && mkdir build && cd build && cmake .. && make -j 3
 ENV PATH=$PATH:/usr/local/metaMDBG/build/bin
 
@@ -341,7 +365,7 @@ ENV PATH=$PATH:/minimap2-${MINIMAP2_VER}_x64-linux
 # kraken2
 #############################################################################################
 
-RUN git clone https://github.com/DerrickWood/kraken2.git /kraken2_code && \
+RUN git clone --branch v2.1.6 --single-branch https://github.com/DerrickWood/kraken2.git /kraken2_code && \
     cd /kraken2_code && \
     ./install_kraken2.sh /kraken2 && \
     rm -rf /kraken2_code
@@ -357,55 +381,25 @@ RUN apt-get update && apt-get install --no-install-recommends -y aria2 && apt-ge
 RUN apt-get update && apt-get install --no-install-recommends -y bedtools \
     && apt-get clean all
 
+# pinned: commit acf3198 (4 commits past tag 0.9; v1.00 baseline)
 RUN git clone https://github.com/tseemann/barrnap.git /opt/barrnap \
+    && cd /opt/barrnap && git checkout acf3198 && cd / \
     && ln -s /opt/barrnap/bin/barrnap /usr/local/bin/barrnap
 
 #############################################################################################
 # myloasm
 #############################################################################################
 
+# avx2 binary: works on linux/amd64 GCP VMs; fails with "Illegal instruction" on arm64 emulation (apple silicon)
 RUN wget https://github.com/bluenote-1577/myloasm/releases/download/v0.4.0/myloasm-0.4.0-x86_64-avx2 && \
     chmod +x myloasm-0.4.0-x86_64-avx2 && \
     mv myloasm-0.4.0-x86_64-avx2 /usr/local/bin/myloasm
     
 #############################################################################################
-# R packages
-#############################################################################################
-
-# basic packages
-RUN R -e "install.packages(c('igraph', 'intervals', 'gplots', 'BiocManager'))"
-RUN R -e "install.packages('seqinr', dependencies=TRUE, repos='http://cran.rstudio.com/')"
-
-# visualization
-RUN R -e "install.packages(c('umap', 'Rtsne'))"
-
-# Biostrings
-RUN R -e "BiocManager::install('Biostrings', ask=F)"
-
-# for strain analysis
-RUN R -e "BiocManager::install(c('dendextend', 'phangorn', 'phylogram'))"
-
-# for G4iMGrinder
-RUN R -e "BiocManager::install('pqsfinder')"
-
-RUN R -e "install.packages(c('patchwork'))"
-
-RUN R -e "install.packages('remotes')" \
-    && R -e "remotes::install_github('Van1yu3/SWKM')"
-
-RUN R -e "install.packages('diagram')"
-
-# for nice scatter plots
-RUN R -e "install.packages('ggrepel')"
-
-RUN R -e "install.packages(c('aod', 'pROC', 'caret'))"
-
-RUN R -e "install.packages(c('hexbin', 'MASS'))"
-
-#############################################################################################
 # appendix
 #############################################################################################
 
+# unpinned: NCBI ships a single rolling installer (no versioned URL); v1.00 baseline was 25.3
 RUN sh -c "$(curl -fsSL ftp://ftp.ncbi.nlm.nih.gov/entrez/entrezdirect/install-edirect.sh)"
 ENV PATH=$PATH:/root/edirect
 
@@ -417,13 +411,14 @@ RUN apt-get update && apt-get install --no-install-recommends -y lftp
 
 # MOB-suite
 RUN apt-get -y install libgnutls28-dev
-RUN $VENV_PIP install Bio
-RUN $VENV_PIP install mob_suite
+RUN $VENV_PIP install Bio==1.8.1
+RUN $VENV_PIP install mob_suite==3.1.9
 
 #############################################################################################
 # kmer-db
 #############################################################################################
 
+# precompiled x86_64 binary (uses avx2): fails with "Illegal instruction" on arm64 emulation (apple silicon)
 RUN mkdir -p /usr/local/kmer-db && \
     cd /usr/local/kmer-db && \
     wget https://github.com/refresh-bio/kmer-db/releases/download/v2.3.1/kmer-db-v2.3.1-x64_linux.tar.gz && \
@@ -433,25 +428,7 @@ RUN mkdir -p /usr/local/kmer-db && \
 
 ENV PATH=$PATH:/usr/local/kmer-db
 
-RUN $VENV_PIP install networkx
-
-#############################################################################################
-# R packages for evo module plotting
-#############################################################################################
-
-# for phylogenetic tree plotting (evo module)
-RUN R -e "install.packages(c('ape', 'ggplot2', 'dplyr', 'tidyr', 'gridExtra'))"
-RUN R -e "BiocManager::install(c('ggtree', 'ggtreeExtra'), ask=F)"
-
-RUN R -e "install.packages(c('htmlwidgets'))"
-
-RUN apt-get update && apt-get install --no-install-recommends -y \
-    libssl-dev \
-    pkg-config \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
-
-RUN R -q -e 'install.packages("plotly", repos="https://cloud.r-project.org"); \
-    stopifnot(requireNamespace("plotly", quietly=TRUE))'
+RUN $VENV_PIP install networkx==3.4.2
 
 #############################################################################################
 # mafft
@@ -465,7 +442,7 @@ RUN apt-get update && \
 # hifiasm-meta
 #############################################################################################
 
-RUN git clone https://github.com/xfengnefx/hifiasm-meta.git && \
+RUN git clone --branch hamtv0.3.5 --single-branch https://github.com/xfengnefx/hifiasm-meta.git && \
     cd hifiasm-meta && make && \
     cp hifiasm_meta /usr/local/bin/
 
@@ -473,7 +450,9 @@ RUN git clone https://github.com/xfengnefx/hifiasm-meta.git && \
 # bracken
 #############################################################################################
 
+# pinned: commit 8732ef5 (1 commit past tag v3.1; v1.00 baseline)
 RUN git clone https://github.com/jenniferlu717/Bracken.git /opt/bracken && \
+    cd /opt/bracken && git checkout 8732ef5 && \
     cd /opt/bracken/src && \
     make
 
@@ -483,8 +462,10 @@ ENV PATH=$PATH:/opt/bracken
 # drep
 #############################################################################################
 
+# pinned: commit 7b4b8fb (23 commits past tag v3.4.2; v1.00 baseline)
 RUN git clone https://github.com/MrOlm/drep.git /opt/drep && \
-    cd /opt/drep && $VENV_PIP install .
+    cd /opt/drep && git checkout 7b4b8fb && \
+    $VENV_PIP install .
 
 #############################################################################################
 # aliases
@@ -496,6 +477,112 @@ RUN echo 'alias gsync="make m=gcp rsync"' >> ~/.bashrc
 # glg gets and cleans
 COPY glg /usr/local/bin/glg
 RUN chmod +x /usr/local/bin/glg
+
+#############################################################################################
+# java + nextflow
+#############################################################################################
+
+RUN apt-get update && apt-get install --no-install-recommends -y openjdk-21-jre-headless && \
+    apt-get clean all
+
+# pinned: get.nextflow.io serves whatever is latest at build time (v1.00 baseline: 25.10.4)
+ENV NXF_VER=25.10.4
+RUN curl -s https://get.nextflow.io | bash && \
+    mv nextflow /usr/local/bin/ && \
+    chmod +x /usr/local/bin/nextflow
+
+#############################################################################################
+# R packages
+#############################################################################################
+
+# prereqs for plotly (compiled from source)
+RUN apt-get update && apt-get install --no-install-recommends -y \
+    libssl-dev \
+    pkg-config \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# every R install ends with stopifnot(requireNamespace(...)) so a silent failure
+# (common for BiocManager::install) causes the docker build to fail rather than
+# producing an image with ghost packages.
+
+RUN R -q -e 'p <- c("igraph","intervals","gplots","BiocManager"); \
+    install.packages(p); \
+    stopifnot(all(sapply(p, requireNamespace, quietly=TRUE)))'
+
+RUN R -q -e 'install.packages("seqinr", dependencies=TRUE, repos="http://cran.rstudio.com/"); \
+    stopifnot(requireNamespace("seqinr", quietly=TRUE))'
+
+RUN R -q -e 'p <- c("umap","Rtsne"); \
+    install.packages(p); \
+    stopifnot(all(sapply(p, requireNamespace, quietly=TRUE)))'
+
+RUN R -q -e 'BiocManager::install("Biostrings", ask=FALSE); \
+    stopifnot(requireNamespace("Biostrings", quietly=TRUE))'
+
+RUN R -q -e 'p <- c("dendextend","phangorn","phylogram"); \
+    BiocManager::install(p, ask=FALSE); \
+    stopifnot(all(sapply(p, requireNamespace, quietly=TRUE)))'
+
+# 2026-04-20: dropped pqsfinder + G4iMGrinder. only caller is modules/dev/metagenomics/G4.
+# reinstall here if G4 is reactivated; pqsfinder needs BH pinned to a boost-v4 era (<=1.87.0-1)
+# to avoid duplicate-symbol errors between system libboost and BH's bundled boost_regex v5.
+
+RUN R -q -e 'install.packages("patchwork"); \
+    stopifnot(requireNamespace("patchwork", quietly=TRUE))'
+
+RUN R -q -e 'install.packages("remotes"); \
+    stopifnot(requireNamespace("remotes", quietly=TRUE))' && \
+    R -q -e 'remotes::install_github("Van1yu3/SWKM"); \
+    stopifnot(requireNamespace("SWKM", quietly=TRUE))'
+
+RUN R -q -e 'install.packages("diagram"); \
+    stopifnot(requireNamespace("diagram", quietly=TRUE))'
+
+RUN R -q -e 'install.packages("ggrepel"); \
+    stopifnot(requireNamespace("ggrepel", quietly=TRUE))'
+
+RUN R -q -e 'p <- c("aod","pROC","caret"); \
+    install.packages(p); \
+    stopifnot(all(sapply(p, requireNamespace, quietly=TRUE)))'
+
+RUN R -q -e 'p <- c("hexbin","MASS"); \
+    install.packages(p); \
+    stopifnot(all(sapply(p, requireNamespace, quietly=TRUE)))'
+
+# for phylogenetic tree plotting (evo module; phytools for malign tree layout gallery)
+RUN R -q -e 'p <- c("ape","ggplot2","dplyr","tidyr","gridExtra","phytools"); \
+    install.packages(p); \
+    stopifnot(all(sapply(p, requireNamespace, quietly=TRUE)))'
+
+# system deps newly required by ggtree's Bioc 3.22 transitive graph:
+# libuv1-dev for 'fs'; fontconfig/freetype/harfbuzz/fribidi for 'systemfonts'; cairo for 'gdtools'
+RUN apt-get update && apt-get install --no-install-recommends -y \
+        libuv1-dev libfontconfig1-dev libfreetype6-dev libharfbuzz-dev libfribidi-dev \
+        libcairo2-dev && \
+    apt-get clean all
+
+RUN R -q -e 'p <- c("ggtree","ggtreeExtra"); \
+    BiocManager::install(p, ask=FALSE); \
+    stopifnot(all(sapply(p, requireNamespace, quietly=TRUE)))'
+
+RUN R -q -e 'install.packages("htmlwidgets"); \
+    stopifnot(requireNamespace("htmlwidgets", quietly=TRUE))'
+
+RUN R -q -e 'install.packages("plotly", repos="https://cloud.r-project.org"); \
+    stopifnot(requireNamespace("plotly", quietly=TRUE))'
+
+RUN R -q -e 'install.packages("scanstatistics"); \
+    stopifnot(requireNamespace("scanstatistics", quietly=TRUE))'
+
+#############################################################################################
+# image identity (kept last: version bumps only invalidate this tiny layer, not the whole image)
+#############################################################################################
+
+# GCP_IMAGE_VER is passed via --build-arg from gcp_image.mk (mdocker target).
+# bump it in modules/cloud/gcp/gcp_int.mk and rebuild to produce a new versioned image.
+ARG GCP_IMAGE_VER=unknown
+ENV GCP_IMAGE_VER=${GCP_IMAGE_VER}
+LABEL org.opencontainers.image.version="${GCP_IMAGE_VER}"
 
 #############################################################################################
 # default command

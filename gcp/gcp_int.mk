@@ -1,5 +1,5 @@
 units:=gcp_dsub.mk gcp_env.mk gcp_sync.mk gcp_image.mk gcp_buckets.mk gcp_download.mk \
-gcp_purge.mk gcp_logs.mk
+gcp_purge.mk gcp_logs.mk gcp_tools.mk
 
 GCP_VER?=v1.00
 $(call _register_module,gcp,GCP_VER,$(units))
@@ -50,11 +50,20 @@ GCP_PLATFORM?=linux/amd64
 
 GCP_IMAGE_NAME?=$(GCP_IMAGE_BASE)-$(GCP_UBUNTU_VER)
 GCP_GCR_HOSTNAME?=gcr.io
-GCP_GCR_IMAGE_PATH?=$(GCP_GCR_HOSTNAME)/$(GCP_PROJECT_ID)/$(GCP_IMAGE_NAME)
+# image reference is version-tagged so each config pins a specific image (see
+# MAKESHIFT_PATTERNS.md §20). without the tag every pull resolved to :latest, causing silent
+# drift across configs that pin different GCP_IMAGE_VER values.
+GCP_GCR_IMAGE_PATH?=$(GCP_GCR_HOSTNAME)/$(GCP_PROJECT_ID)/$(GCP_IMAGE_NAME):$(GCP_IMAGE_VER)
+
+# per-image assets (Dockerfile, entrypoint scripts, tools_versions.sh, etc.)
+GCP_CONTAINER_DIR?=$(_md)/containers/$(GCP_IMAGE_NAME)
+
+# mdocker image version: bump when the Dockerfile actually changes tool behavior
+# (see modules/dev/MAKESHIFT_PATTERNS.md sec 20 for the bump policy).
+GCP_IMAGE_VER?=v1.01
 
 GCP_DOCKERHUB_BASE?=eitanyaffe
-GCP_DOCKERHUB_IMAGE_VER?=v1.00
-GCP_DOCKERHUB_IMAGE?=$(GCP_DOCKERHUB_BASE)/$(GCP_IMAGE_NAME):$(GCP_DOCKERHUB_IMAGE_VER)
+GCP_DOCKERHUB_IMAGE?=$(GCP_DOCKERHUB_BASE)/$(GCP_IMAGE_NAME):$(GCP_IMAGE_VER)
 
 # GCP_DSUB_PROVIDER?=google-cls-v2
 GCP_DSUB_PROVIDER?=google-batch
@@ -282,6 +291,21 @@ GCP_DOWNLOAD_DISK_GB?=1500
 GCP_DOWNLOAD_ID?=d1
 GCP_DOWNLOAD_ROOT_DIR?=$(OUTPUT_DIR)
 GCP_DOWNLOAD_WORK_DIR?=$(GCP_DOWNLOAD_ROOT_DIR)/download/$(GCP_DOWNLOAD_ID)
+
+###############################################################################################
+# gcp_tools.mk
+###############################################################################################
+
+# output dir for mdocker tool-version snapshots (versioned subdir per MAKESHIFT_PATTERNS.md sec 2)
+GCP_TOOLS_DIR?=$(OUTPUT_DIR)/image_tool_versions/$(GCP_IMAGE_NAME)/$(GCP_IMAGE_VER)/$(PAR_TYPE)
+
+# snapshot file: one per image name; bump GCP_IMAGE_VER to land in a new dir
+GCP_TOOLS_FILE?=$(GCP_TOOLS_DIR)/details.txt
+
+# shared bucket for tool-version snapshots: project-scoped, same across users/configs.
+# re-running overwrites the file at the same path (intentional).
+GCP_TOOLS_BUCKET?=gs://$(GCP_PROJECT_ID)-image-tool-versions
+GCP_TOOLS_BUCKET_PATH?=$(GCP_TOOLS_BUCKET)/$(GCP_IMAGE_NAME)/$(GCP_IMAGE_VER)/$(PAR_TYPE)/details.txt
 
 ###############################################################################################
 # gcp_logs.mk
