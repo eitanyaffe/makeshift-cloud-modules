@@ -60,7 +60,7 @@ GCP_CONTAINER_DIR?=$(_md)/containers/$(GCP_IMAGE_NAME)
 
 # mdocker image version: bump when the Dockerfile actually changes tool behavior
 # (see modules/dev/MAKESHIFT_PATTERNS.md sec 20 for the bump policy).
-GCP_IMAGE_VER?=v1.01
+GCP_IMAGE_VER?=v1.02
 
 GCP_DOCKERHUB_BASE?=eitanyaffe
 GCP_DOCKERHUB_IMAGE?=$(GCP_DOCKERHUB_BASE)/$(GCP_IMAGE_NAME):$(GCP_IMAGE_VER)

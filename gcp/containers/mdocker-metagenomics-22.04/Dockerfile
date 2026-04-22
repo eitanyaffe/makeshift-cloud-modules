@@ -125,8 +125,7 @@ RUN apt-get update \
 # gcsfuse
 #############################################################################################
 
-# current version (0.42.1) fails to mount
-ENV GCSFUSE_VER=0.41.12
+ENV GCSFUSE_VER=3.2.6
 RUN curl -L -O https://github.com/GoogleCloudPlatform/gcsfuse/releases/download/v${GCSFUSE_VER}/gcsfuse_${GCSFUSE_VER}_amd64.deb \
     && dpkg --install gcsfuse_${GCSFUSE_VER}_amd64.deb
 
@@ -137,8 +136,8 @@ RUN curl -L -O https://github.com/GoogleCloudPlatform/gcsfuse/releases/download/
 # Install google-cloud-batch in venv
 RUN $VENV_PIP install google-cloud-batch==0.17.20
 
-# Clone dsub and install in venv (pinned to tag v0.5.0)
-RUN git clone --branch v0.5.0 --single-branch https://github.com/DataBiosphere/dsub /dsub && \
+# Clone dsub and install in venv (pinned to tag v0.5.1)
+RUN git clone --branch v0.5.1 --single-branch https://github.com/DataBiosphere/dsub /dsub && \
     cd /dsub && $VENV_PIP install .
 
 #############################################################################################
@@ -187,18 +186,20 @@ RUN echo 'setuptools<81' > /tmp/pip-build.cons && \
 # diamond
 #############################################################################################
 
+# 2.1.x changed the .dmnd database format; existing 2.0-built indexes must be rebuilt
 RUN mkdir -p /usr/local/diamond && \
     cd /usr/local/diamond && \
-    wget https://github.com/bbuchfink/diamond/releases/download/v2.0.15/diamond-linux64.tar.gz && \
+    wget https://github.com/bbuchfink/diamond/releases/download/v2.1.24/diamond-linux64.tar.gz && \
     tar xvf diamond-linux64.tar.gz && rm -rf diamond-linux64.tar.gz && cp diamond /usr/local/bin
 
 #############################################################################################
 # sra-tools
 #############################################################################################
 
-ARG SRATOOLS_VERSION=3.2.0
+ARG SRATOOLS_VERSION=3.4.1
 RUN apt-get update && apt-get --quiet install --yes curl uuid-runtime && apt-get clean all
-RUN curl https://ftp-trace.ncbi.nlm.nih.gov/sra/sdk/${SRATOOLS_VERSION}/sratoolkit.${SRATOOLS_VERSION}-centos_linux64-cloud.tar.gz | tar xz -C /
+# NCBI renamed the cloud build from centos_linux64-cloud to alma_linux64-cloud at 3.3
+RUN curl https://ftp-trace.ncbi.nlm.nih.gov/sra/sdk/${SRATOOLS_VERSION}/sratoolkit.${SRATOOLS_VERSION}-alma_linux64-cloud.tar.gz | tar xz -C /
 ENV PATH=/usr/local/ncbi/sra-tools/bin:${PATH}
 RUN mkdir -p /root/.ncbi && \
     printf '/LIBS/GUID = "%s"\n' `uuidgen` > /root/.ncbi/user-settings.mkfg && \
@@ -318,9 +319,9 @@ RUN wget https://github.com/matsen/pplacer/releases/download/v1.1.alpha19/pplace
     rm -rf pplacer-Linux-v1.1.alpha19
 
 # FASTANI
-RUN wget https://github.com/ParBLiSS/FastANI/releases/download/v1.33/fastANI-Linux64-v1.33.zip -q && \
-    unzip fastANI-Linux64-v1.33.zip -d /usr/bin && \
-    rm fastANI-Linux64-v1.33.zip
+RUN wget https://github.com/ParBLiSS/FastANI/releases/download/v1.34/fastANI-Linux64-v1.34.zip -q && \
+    unzip fastANI-Linux64-v1.34.zip -d /usr/bin && \
+    rm fastANI-Linux64-v1.34.zip
 
 # SKANI (unpinnable: upstream publishes the precompiled binary only on the rolling
 # "latest" github release; versioned tags (v0.3.1, v0.3.0, ...) carry no assets.
@@ -350,7 +351,7 @@ RUN cpanm install XML::Parser@2.47
 #############################################################################################
 
 RUN apt-get update && apt-get -y install cmake
-# pinned: default branch drifted and broke the linker; tag metaMDBG-1.2 is the v1.00 baseline
+# 1.3.x tags fail to link (missing static member defs for CoverageRegion::low/normal); holding at 1.2
 ENV METAMDBG_VER=metaMDBG-1.2
 RUN mkdir -p /usr/local/metaMDBG && \
     git clone --branch ${METAMDBG_VER} --single-branch https://github.com/GaetanBenoitDev/metaMDBG.git /usr/local/metaMDBG && \
@@ -381,9 +382,7 @@ RUN apt-get update && apt-get install --no-install-recommends -y aria2 && apt-ge
 RUN apt-get update && apt-get install --no-install-recommends -y bedtools \
     && apt-get clean all
 
-# pinned: commit acf3198 (4 commits past tag 0.9; v1.00 baseline)
-RUN git clone https://github.com/tseemann/barrnap.git /opt/barrnap \
-    && cd /opt/barrnap && git checkout acf3198 && cd / \
+RUN git clone --branch v1.10.6 --single-branch https://github.com/tseemann/barrnap.git /opt/barrnap \
     && ln -s /opt/barrnap/bin/barrnap /usr/local/bin/barrnap
 
 #############################################################################################
@@ -391,9 +390,9 @@ RUN git clone https://github.com/tseemann/barrnap.git /opt/barrnap \
 #############################################################################################
 
 # avx2 binary: works on linux/amd64 GCP VMs; fails with "Illegal instruction" on arm64 emulation (apple silicon)
-RUN wget https://github.com/bluenote-1577/myloasm/releases/download/v0.4.0/myloasm-0.4.0-x86_64-avx2 && \
-    chmod +x myloasm-0.4.0-x86_64-avx2 && \
-    mv myloasm-0.4.0-x86_64-avx2 /usr/local/bin/myloasm
+RUN wget https://github.com/bluenote-1577/myloasm/releases/download/v0.5.1/myloasm-0.5.1-x86_64-avx2 && \
+    chmod +x myloasm-0.5.1-x86_64-avx2 && \
+    mv myloasm-0.5.1-x86_64-avx2 /usr/local/bin/myloasm
     
 #############################################################################################
 # appendix
