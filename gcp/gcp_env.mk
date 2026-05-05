@@ -65,6 +65,82 @@ denv: validate_env
 	docker attach $(CONTAINER_NAME); echo "RC=$$?"; date
 	docker rm $(CONTAINER_NAME)
 
+# denv_ro family: idempotent detached read-only env for agent-driven inspection
+#   - deterministic container name: $(PIPELINE_NAME)-$(PROJECT_NAME)-ro
+#   - source, configs, keys bind-mounted read-only
+#   - gcsfuse buckets mounted read-only (GCP_GCSFUSE_EXTRA includes -o ro)
+#   - docker socket NOT mounted (no nested-container escape)
+#   - /tmp stays bind-mounted rw so data can be copied locally for inspection
+#   - PID 1 is 'sleep infinity'; enter via: docker exec -it <name> bash
+#   - targets: denv_ro (up, idempotent) / denv_ro_down / denv_ro_restart / denv_ro_list
+CONTAINER_NAME_RO:=$(PIPELINE_NAME)-$(PROJECT_NAME)-ro
+
+denv_ro: validate_env
+	@if docker ps -q --filter "name=^$(CONTAINER_NAME_RO)$$" | grep -q .; then \
+		echo "$(CONTAINER_NAME_RO) already running"; \
+		echo "enter: docker exec -it $(CONTAINER_NAME_RO) bash"; \
+	else \
+		if docker ps -aq --filter "name=^$(CONTAINER_NAME_RO)$$" | grep -q .; then \
+			echo "removing stale $(CONTAINER_NAME_RO)"; \
+			docker rm $(CONTAINER_NAME_RO) >/dev/null; \
+		fi; \
+		docker run -d -it --platform=$(GCP_PLATFORM) --name $(CONTAINER_NAME_RO) \
+		       --cap-add SYS_ADMIN --device /dev/fuse --security-opt apparmor:unconfined \
+		       -v /tmp/.Xauthority-host:/root/.Xauthority:ro \
+		       -v /tmp/.X11-unix:/tmp/.X11-unix \
+		       -e XAUTHORITY=/root/.Xauthority \
+		       -e DISPLAY=host.docker.internal:0 \
+		       -e MAKESHIFT_ROOT=/makeshift \
+		       -e MAKESHIFT_LOCAL_PATH=$(MAKESHIFT_ROOT) \
+		       -v $(MAKESHIFT_ROOT):/makeshift:ro \
+		       -e MAKESHIFT_CONFIG=/makeshift-config \
+		       -e GCP_PROJECT_ID=$(GCP_PROJECT_ID) \
+		       -v $(MAKESHIFT_CONFIG):/makeshift-config:ro \
+		       -v $(dir $(MAKESHIFT_GCP_KEY)):/keys:ro \
+		       -e GOOGLE_APPLICATION_CREDENTIALS=/keys/$(notdir $(MAKESHIFT_GCP_KEY)) \
+		       -e CLOUDSDK_CONFIG=/tmp/gcloud-config \
+		       -e SENDGRID_API_KEY=$(PAR_SENDGRID_API_KEY) \
+		       -e PAR_NOTIFY_EMAIL=$(PAR_NOTIFY_EMAIL) \
+		       -e BOTO_CONFIG=/makeshift/.boto \
+		       -e USER=$(USER) \
+		       -e c=$(c) \
+		       -e GCP_GCSFUSE_EXTRA="--implicit-dirs -o ro" \
+		       -v /tmp:/tmp \
+		       -w /makeshift/$(GCP_PIPELINE_RELATIVE_DIR) \
+		       $(GCP_GCR_IMAGE_PATH) \
+		       bash -c "echo \"export PS1='[[RO:$(PIPELINE_NAME):$(PROJECT_NAME)]] \w % '\" >> ~/.bashrc && make m=gcp mount_buckets bucket_summary && touch /root/.denv_ro_ready && exec sleep infinity" >/dev/null; \
+		echo "starting $(CONTAINER_NAME_RO), waiting for mounts..."; \
+		ready=0; \
+		for i in $$(seq 1 120); do \
+			if docker exec $(CONTAINER_NAME_RO) test -f /root/.denv_ro_ready 2>/dev/null; then \
+				ready=1; break; \
+			fi; \
+			if ! docker ps -q --filter "name=^$(CONTAINER_NAME_RO)$$" | grep -q .; then \
+				echo "container exited before ready. last logs:"; \
+				docker logs $(CONTAINER_NAME_RO) 2>&1 | tail -30; \
+				exit 1; \
+			fi; \
+			sleep 1; \
+		done; \
+		if [ $$ready -eq 1 ]; then \
+			echo "$(CONTAINER_NAME_RO) is ready"; \
+			echo "enter: docker exec -it $(CONTAINER_NAME_RO) bash"; \
+		else \
+			echo "timeout waiting for mounts"; exit 1; \
+		fi; \
+	fi
+
+denv_ro_down:
+	@if docker ps -aq --filter "name=^$(CONTAINER_NAME_RO)$$" | grep -q .; then \
+		docker stop $(CONTAINER_NAME_RO) >/dev/null 2>&1 || true; \
+		docker rm $(CONTAINER_NAME_RO) >/dev/null 2>&1 || true; \
+		echo "$(CONTAINER_NAME_RO) removed"; \
+	else \
+		echo "$(CONTAINER_NAME_RO) not found"; \
+	fi
+
+denv_ro_restart: denv_ro_down denv_ro
+
 CONTAINER_NAME:=$(PIPELINE_NAME)-$(PROJECT_NAME)-$(shell bash -c 'echo $$RANDOM')
 denv2:
 	docker run -d -it --name $(CONTAINER_NAME) \

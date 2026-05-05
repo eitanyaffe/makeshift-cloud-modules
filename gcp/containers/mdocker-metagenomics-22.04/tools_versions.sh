@@ -135,7 +135,7 @@ print_R() {
 
 echo "# apt packages (explicit in Dockerfile)"
 # libgsl-dev replaces libgsl0-dev on 22.04; query both and keep whichever is installed
-print_apt bwa samtools prodigal hmmer fasttree mafft bedtools lftp clustalo \
+print_apt bwa samtools prodigal hmmer fasttree mafft bedtools lftp clustalo aragorn \
     vim aria2 unzip cmake r-base r-base-core \
     openjdk-21-jre-headless python3 python3-dev python3-venv python3-pip python3-setuptools \
     libssl-dev pkg-config libgsl-dev libboost-all-dev libgnutls28-dev \
@@ -181,7 +181,7 @@ echo ""
 echo "# python (pip) packages (venv at /opt/venv)"
 VPIP=/opt/venv/bin/pip
 for p in crcmod sendgrid sourmash google-cloud-batch dsub pandas gtdbtk \
-         numpy matplotlib pysam checkm-genome Bio mob_suite networkx; do
+         numpy matplotlib pysam checkm-genome Bio mob_suite networkx genomad macsyfinder; do
     print_pip $VPIP "$p"
 done
 
@@ -206,7 +206,7 @@ echo "# R packages (explicit in Dockerfile)"
 for p in igraph intervals gplots BiocManager seqinr umap Rtsne Biostrings \
          dendextend phangorn phylogram patchwork remotes SWKM \
          diagram ggrepel aod pROC caret hexbin MASS ape ggplot2 dplyr tidyr \
-         gridExtra phytools ggtree ggtreeExtra htmlwidgets plotly scanstatistics; do
+         gridExtra phytools ggtree ggtreeExtra htmlwidgets plotly scanstatistics qrcode; do
     print_R "$p"
 done
 

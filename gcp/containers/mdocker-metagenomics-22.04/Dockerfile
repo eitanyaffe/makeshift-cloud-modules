@@ -573,6 +573,32 @@ RUN R -q -e 'install.packages("plotly", repos="https://cloud.r-project.org"); \
 RUN R -q -e 'install.packages("scanstatistics"); \
     stopifnot(requireNamespace("scanstatistics", quietly=TRUE))'
 
+# used by fig.start/fig.end for the bottom-left QR path stamp
+RUN R -q -e 'install.packages("qrcode"); \
+    stopifnot(requireNamespace("qrcode", quietly=TRUE))'
+
+# genomad: virus/plasmid classifier; needs aragorn (tRNA detection) and mmseqs2 (already present)
+# APPENDIX-ADDED 2026-04-29: relocate to "Assemblers / genome classifiers" in next reorg
+RUN apt-get update && apt-get install --no-install-recommends -y aragorn && apt-get clean all
+RUN $VENV_PIP install genomad==1.12.0
+
+#############################################################################################
+# macsyfinder + CONJScan models (conjugative element detection on protein FASTA)
+#############################################################################################
+
+# pip pulls colorlog, colorama, pyyaml, packaging (networkx + pandas already present)
+# hmmsearch on PATH from gtdb-tk section; msf_data needs git (installed in basics)
+# APPENDIX-ADDED 2026-04-29: relocate near genomad/eggNOG in next reorg
+ARG MACSYFINDER_VER=2.1.6
+# reinstall numpy+pandas after macsyfinder to resolve ABI mismatch (dtype size changed)
+RUN $VENV_PIP install macsyfinder==${MACSYFINDER_VER} && \
+    $VENV_PIP install --force-reinstall numpy pandas
+
+ARG CONJSCAN_VER=2.0.2
+ENV MACSY_MODELS_DIR=/opt/macsyfinder/models
+RUN mkdir -p $MACSY_MODELS_DIR && \
+    msf_data install --target $MACSY_MODELS_DIR CONJScan==${CONJSCAN_VER}
+
 #############################################################################################
 # image identity (kept last: version bumps only invalidate this tiny layer, not the whole image)
 #############################################################################################

@@ -2,6 +2,21 @@
 
 Newest-first. Each stanza covers the `GCP_IMAGE_VER` label in the heading. For deeper context see git history and the `details.txt` snapshots under `gs://${GCP_PROJECT_ID}-image-tool-versions/mdocker-metagenomics-22.04/vX.YY/{dsub,local}/`.
 
+## v1.03 — 2026-04-22 (mode: mode-2-add)
+
+Added the `qrcode` R package. No pinned-tool version changes, no reorg.
+
+### R packages
+- Added `qrcode` (CRAN). Used by `fig.start`/`fig.end` in `makeshift-core/utils.r` to stamp a small vector QR of the output path in the bottom-left corner of every PDF/PNG. Payload is `src: <full path>` so phone QR readers offer a clean copy/paste.
+
+### tools_versions.sh
+- Added `qrcode` to the R-package loop so its version is recorded in `details.txt`.
+
+### operational notes
+- DB rebuild required: no.
+- Denv restart required: yes, to pick up v1.03.
+- Rebuild cost: one new cached R layer at the tail; all earlier layers reused cache.
+
 ## v1.02 — 2026-04-20 (mode: mode-3-upgrade)
 
 Batch upgrade of seven pinned tools; no reorg, no Ubuntu bump.

@@ -302,7 +302,6 @@ dsub.base=function(job.work.dir,
                    job.keys,
                    max.report.level,
                    email,
-                   sendgrid.key,
                    use.private)
 {
     job.key = job.keys[length(job.keys)]
@@ -365,8 +364,6 @@ dsub.base=function(job.work.dir,
         command = paste(command, "--subnetwork", subnetwork)
     }
 
-    # email variables
-    command  = paste(command, "--env", paste0("SENDGRID_API_KEY=", sendgrid.key))
     command  = paste(command, "--env", paste0("PAR_NOTIFY_EMAIL=", email))
 
     # append config
@@ -388,7 +385,8 @@ dsub.base=function(job.work.dir,
     
     # add job keys as labels (to allow deletion) and environment variables (to pass on to nested calls)
     for (ii in 1:ms.level) {
-        command  = paste(command, sprintf("--label 'ms-job-key-%d=%s'", ii, job.keys[ii]))
+        # GCP label values must be lowercase and at most 63 characters
+        command  = paste(command, sprintf("--label 'ms-job-key-%d=%s'", ii, substr(tolower(job.keys[ii]), 1, 63)))
         command  = paste(command,"--env", sprintf("MS_JOB_KEY_%d=%s", ii, job.keys[ii]))
     }
 
@@ -399,7 +397,7 @@ dsub.base=function(job.work.dir,
     if (preemtible.count == 0 && non.preemtible.retry.count > 0)
         command  = paste(command, "--retries", non.preemtible.retry.count)
     
-    list(command=command, job.key.fn=job.key.fn, logging=logging, sendgrid.key=sendgrid.key, region=region, provider=provider, project=project)
+    list(command=command, job.key.fn=job.key.fn, logging=logging, region=region, provider=provider, project=project)
 }
 
 format.email.message=function(ll)
@@ -551,11 +549,11 @@ dsub.run.no.wait=function(command, job.keys, project, provider, region, ms.level
     job.rc
 }
 
-send.job.completion.email=function(send.email.flag, email, sendgrid.key, wait, job.rc, ms.level, 
+send.job.completion.email=function(send.email.flag, email, wait, job.rc, ms.level, 
                                     max.report.level, job.id, ms.title, job.keys, project.name, 
                                     ms.type, ms.desc, logging)
 {
-    should.send.email = send.email.flag && email != "NONE" && sendgrid.key != "NONE"
+    should.send.email = send.email.flag && email != "NONE" && read.sendgrid.key() != "NONE" && read.sendgrid.key() != ""
     should.send.email = should.send.email && (job.rc != 0 || (wait && ms.level <= max.report.level))
     
     if (!should.send.email)
@@ -590,8 +588,7 @@ send.job.completion.email=function(send.email.flag, email, sendgrid.key, wait, j
     rc = 1
     count = 1
     while (rc && count <= 4) { 
-        rc = send.email(sendgrid.key=sendgrid.key,
-                        from.email=email,
+        rc = send.email(from.email=email,
                         to.email=email,
                         subject=email.subject,
                         message=email.message,
@@ -640,7 +637,7 @@ verify.final.file=function(out.paths, job.key)
 
 dsub.run=function(command, dry, wait, project, provider, region, job.keys, ms.level, log.basedir, job.id, 
                   project.name, ms.type, ms.title, ms.desc, logging, email, max.report.level,
-                  send.email.flag, sendgrid.key, out.paths)
+                  send.email.flag, out.paths, pipeline.dir=NULL)
 {
     if (wait) {
         command = paste(command, "--wait")
@@ -652,6 +649,9 @@ dsub.run=function(command, dry, wait, project, provider, region, job.keys, ms.le
     if (ms.level == 1) {
         cat(paste0("======================================================================================\n"))
         cat(sprintf(">>> Makeshift job instructions: \n"))
+        cat(sprintf("GCP project: %s\n", project))
+        if (!is.null(pipeline.dir) && length(pipeline.dir) == 1 && nzchar(as.character(pipeline.dir)))
+            cat(sprintf("Pipeline: %s\n", pipeline.dir))
         cat(sprintf("The <run_key> associated with this run is %s\n", job.keys[1]))
         log.dir = paste0(log.basedir, "/runs/", job.keys[1])
         system(paste("mkdir -p", log.dir))
@@ -689,7 +689,7 @@ dsub.run=function(command, dry, wait, project, provider, region, job.keys, ms.le
         }
     }
 
-    send.job.completion.email(send.email.flag=send.email.flag, email=email, sendgrid.key=sendgrid.key,
+    send.job.completion.email(send.email.flag=send.email.flag, email=email,
                                wait=wait, job.rc=job.rc, ms.level=ms.level, max.report.level=max.report.level,
                                job.id=job.id, ms.title=ms.title, job.keys=job.keys, project.name=project.name,
                                ms.type=ms.type, ms.desc=ms.desc, logging=logging)
@@ -752,7 +752,6 @@ dsub.ms=function(job.work.dir,
                  email,
                  max.report.level,
                  send.email.flag,
-                 sendgrid.key,
                  params=NULL)
 {
     job.keys = get.job.keys(ms.level=ms.level, name=name)
@@ -786,7 +785,6 @@ dsub.ms=function(job.work.dir,
                       job.keys=job.keys,
                       job.id=job.id,
                       batch.index=0,
-                      sendgrid.key=sendgrid.key,
                       max.report.level=max.report.level,
                       email=email,
                       ms.level=ms.level,
@@ -846,7 +844,8 @@ dsub.ms=function(job.work.dir,
              job.keys=job.keys, ms.level=ms.level, log.basedir=log.basedir,
              project.name=project.name, max.report.level=max.report.level, job.id=job.id,
              ms.title=name, ms.type="single", ms.desc=make.base, logging=dbase$logging, email=email,
-             send.email.flag=send.email.flag, sendgrid.key=sendgrid.key, out.paths=out.path)
+             send.email.flag=send.email.flag, out.paths=out.path,
+             pipeline.dir=wdir)
 }
 
 ############################################################################################
@@ -919,7 +918,6 @@ dsub.ms.tasks=function(job.work.dir,
                        email,
                        max.report.level,
                        send.email.flag,
-                       sendgrid.key,
                        params=NULL)
 {
     job.keys = get.job.keys(ms.level=ms.level, name=name)
@@ -953,7 +951,6 @@ dsub.ms.tasks=function(job.work.dir,
                       job.id=job.id,
                       batch.index=batch.index,
                       email=email,
-                      sendgrid.key=sendgrid.key,
                       max.report.level=max.report.level,
                       ms.level=ms.level,
                       use.private=!send.email.flag)
@@ -1059,7 +1056,8 @@ dsub.ms.tasks=function(job.work.dir,
              job.keys=job.keys, ms.level=ms.level, log.basedir=log.basedir,
              project.name=project.name, max.report.level=max.report.level, job.id=job.id,
              ms.title=name, ms.type="tasks_simple", ms.desc=make.base, logging=dbase$logging, email=email,
-             send.email.flag=send.email.flag, sendgrid.key=sendgrid.key, out.paths=out.paths)
+             send.email.flag=send.email.flag, out.paths=out.paths,
+             pipeline.dir=wdir)
 }
 
 ############################################################################################
@@ -1132,7 +1130,6 @@ dsub.ms.complex=function(job.work.dir,
                          email,
                          max.report.level,
                          send.email.flag,
-                         sendgrid.key,
                          params=NULL)
 {
     job.keys = get.job.keys(ms.level=ms.level, name=name)
@@ -1166,7 +1163,6 @@ dsub.ms.complex=function(job.work.dir,
                       job.id=job.id,
                       batch.index=batch.index,
                       email=email,
-                      sendgrid.key=sendgrid.key,
                       max.report.level=max.report.level,
                       ms.level=ms.level,
                       use.private=!send.email.flag)
@@ -1273,7 +1269,8 @@ dsub.ms.complex=function(job.work.dir,
              job.keys=job.keys, ms.level=ms.level, log.basedir=log.basedir,
              project.name=project.name, max.report.level=max.report.level, job.id=job.id,
              ms.title=name, ms.type="tasks_complex", ms.desc=make.base, logging=dbase$logging, email=email,
-             send.email.flag=send.email.flag, sendgrid.key=sendgrid.key, out.paths=out.paths)
+             send.email.flag=send.email.flag, out.paths=out.paths,
+             pipeline.dir=wdir)
              
 }
 
@@ -1326,9 +1323,9 @@ dsub.direct=function(job.work.dir,
                      email,
                      max.report.level,
                      send.email.flag,
-                     sendgrid.key,
                      save.job.stats,
-                     drop.params)
+                     drop.params,
+                     pipeline.dir=NULL)
 {
     job.keys = get.job.keys(ms.level=ms.level, name=name)
     pp = parse.params(params=params, drop.params=drop.params)
@@ -1365,7 +1362,6 @@ dsub.direct=function(job.work.dir,
                       job.id=job.id,
                       batch.index=0,
                       email=email,
-                      sendgrid.key=sendgrid.key,
                       max.report.level=max.report.level,
                       ms.level=ms.level,
                       use.private=F)
@@ -1437,5 +1433,6 @@ dsub.direct=function(job.work.dir,
              job.keys=job.keys, ms.level=ms.level, log.basedir=log.basedir,
              project.name=project.name, max.report.level=max.report.level, job.id=job.id,
              ms.title=name, ms.type="direct", ms.desc=command, logging=dbase$logging, email=email,
-             send.email.flag=send.email.flag, sendgrid.key=sendgrid.key, out.paths=out.path)
+             send.email.flag=send.email.flag, out.paths=out.path,
+             pipeline.dir=pipeline.dir)
 }

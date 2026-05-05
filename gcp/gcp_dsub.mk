@@ -64,7 +64,6 @@ dsub:
 	       email=$(PAR_NOTIFY_EMAIL) \
 	       max.report.level=$(PAR_NOTIFY_MAX_LEVEL) \
 	       send.email.flag=$(PAR_EMAIL) \
-	       sendgrid.key=$(PAR_SENDGRID_API_KEY) \
 	       params="DUMMY~1 $(subst =,~,$(GCP_DSUB_MAKEFLAGS))"
 
 # multiple tasks over single variable
@@ -118,7 +117,6 @@ dsub_tasks:
 	       email=$(PAR_NOTIFY_EMAIL) \
 	       max.report.level=$(PAR_NOTIFY_MAX_LEVEL) \
 	       send.email.flag=$(PAR_EMAIL) \
-	       sendgrid.key=$(PAR_SENDGRID_API_KEY) \
 	       params="DUMMY~1 $(subst =,~,$(GCP_DSUB_MAKEFLAGS))"
 
 # multiple tasks using table
@@ -172,7 +170,6 @@ dsub_tasks_complex:
 	       email=$(PAR_NOTIFY_EMAIL) \
 	       max.report.level=$(PAR_NOTIFY_MAX_LEVEL) \
 	       send.email.flag=$(PAR_EMAIL) \
-	       sendgrid.key=$(PAR_SENDGRID_API_KEY) \
 	       params="DUMMY~1 $(subst =,~,$(GCP_DSUB_MAKEFLAGS))"
 
 # single direct call without makeshift 
@@ -181,6 +178,7 @@ dsub_direct:
 	       job.work.dir=$(GCP_WORK_DIR) \
 	       base.mount=$(GCP_DSUB_ODIR_BUCKET_BASE) \
 	       out.bucket=$(GCP_DSUB_ODIR_BUCKET) \
+	       pipeline.dir=$(GCP_PIPELINE_RELATIVE_DIR) \
 	       provider=$(GCP_DSUB_PROVIDER) \
 	       project=$(GCP_PROJECT_ID) \
 	       zones=$(GCP_ZONE) \
@@ -222,7 +220,6 @@ dsub_direct:
 	       email=$(PAR_NOTIFY_EMAIL) \
 	       max.report.level=$(PAR_NOTIFY_MAX_LEVEL) \
 	       send.email.flag=$(PAR_EMAIL) \
-	       sendgrid.key=$(PAR_SENDGRID_API_KEY) \
 	       save.job.stats=$(DSUB_SAVE_JOB_STATS) \
 	       params="DUMMY~1 $(subst =,~,$(GCP_DSUB_MAKEFLAGS))"
 
