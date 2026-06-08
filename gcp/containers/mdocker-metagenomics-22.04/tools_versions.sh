@@ -166,6 +166,9 @@ print_cmd_grep  tarball gcloud      'Google Cloud SDK' gcloud --version
 print_cmd_grep  tarball blast+      'blastn:'          blastn -version
 print_cmd_grep  tarball kraken2     'version'          kraken2 --version
 print_cmd       tarball edirect     esearch -version
+print_cmd_grep  tarball streme      'Version'          streme --version
+print_cmd_grep  tarball fimo        'Version'          fimo --version
+print_cmd_grep  tarball infernal    'Infernal [0-9]'   cmscan -h
 
 echo ""
 echo "# git clones (HEAD + nearest tag)"
@@ -176,6 +179,7 @@ print_git barrnap       /opt/barrnap
 print_git hifiasm-meta  /hifiasm-meta
 print_git Bracken       /opt/bracken
 print_git drep          /opt/drep
+print_git trnascan-se   /opt/trnascan-se-src
 
 echo ""
 echo "# python (pip) packages (venv at /opt/venv)"
@@ -206,7 +210,8 @@ echo "# R packages (explicit in Dockerfile)"
 for p in igraph intervals gplots BiocManager seqinr umap Rtsne Biostrings \
          dendextend phangorn phylogram patchwork remotes SWKM \
          diagram ggrepel aod pROC caret hexbin MASS ape ggplot2 dplyr tidyr \
-         gridExtra phytools ggtree ggtreeExtra htmlwidgets plotly scanstatistics qrcode; do
+         gridExtra phytools ggtree ggtreeExtra htmlwidgets plotly scanstatistics qrcode \
+         ggseqlogo; do
     print_R "$p"
 done
 

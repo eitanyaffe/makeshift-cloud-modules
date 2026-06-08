@@ -90,8 +90,10 @@ MS_LEVEL?=1
 # style can be custom or defined
 PAR_SPEC_STYLE?=defined
 
-# default is the cheapest machine todate
-PAR_MACHINE?=e2-small
+# default machine for par jobs without an explicit PAR_MACHINE override.
+# e2-standard-2 (2 vCPU, 8 GB) — e2-small (2 GB) is too tight for Batch bootstrap
+# (docker + gcsfuse mounts + mdocker container).
+PAR_MACHINE?=e2-standard-2
 #PAR_MACHINE?=e2-micro
 #PAR_MACHINE?=n1-standard-1
 
@@ -100,7 +102,7 @@ PAR_CPU_COUNT?=2
 PAR_RAM_GB?=8
 
 # boot disk
-PAR_BOOT_GB?=16
+PAR_BOOT_GB?=32
 
 # data disk pd-ssd / pd-standard
 PAR_DISK_TYPE?=pd-standard

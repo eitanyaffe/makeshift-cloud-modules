@@ -580,7 +580,7 @@ RUN R -q -e 'install.packages("qrcode"); \
 # genomad: virus/plasmid classifier; needs aragorn (tRNA detection) and mmseqs2 (already present)
 # APPENDIX-ADDED 2026-04-29: relocate to "Assemblers / genome classifiers" in next reorg
 RUN apt-get update && apt-get install --no-install-recommends -y aragorn && apt-get clean all
-RUN $VENV_PIP install genomad==1.12.0
+RUN $VENV_PIP install --no-cache-dir genomad==1.12.0
 
 #############################################################################################
 # macsyfinder + CONJScan models (conjugative element detection on protein FASTA)
@@ -591,13 +591,65 @@ RUN $VENV_PIP install genomad==1.12.0
 # APPENDIX-ADDED 2026-04-29: relocate near genomad/eggNOG in next reorg
 ARG MACSYFINDER_VER=2.1.6
 # reinstall numpy+pandas after macsyfinder to resolve ABI mismatch (dtype size changed)
-RUN $VENV_PIP install macsyfinder==${MACSYFINDER_VER} && \
-    $VENV_PIP install --force-reinstall numpy pandas
+RUN $VENV_PIP install --no-cache-dir macsyfinder==${MACSYFINDER_VER} && \
+    $VENV_PIP install --no-cache-dir --force-reinstall numpy pandas
 
 ARG CONJSCAN_VER=2.0.2
 ENV MACSY_MODELS_DIR=/opt/macsyfinder/models
 RUN mkdir -p $MACSY_MODELS_DIR && \
     msf_data install --target $MACSY_MODELS_DIR CONJScan==${CONJSCAN_VER}
+
+#############################################################################################
+# ggseqlogo
+#############################################################################################
+
+# APPENDIX-ADDED 2026-05-21: relocate to "R packages" in next reorg
+# needed for sequence logo plots (no versioned release tags; pinned to master)
+RUN R -q -e 'remotes::install_github("omarwagih/ggseqlogo"); \
+    stopifnot(requireNamespace("ggseqlogo", quietly=TRUE))'
+
+#############################################################################################
+# MEME suite (streme, fimo, meme-get-motif)
+#############################################################################################
+
+# APPENDIX-ADDED 2026-05-22: relocate to "Sequence analysis / motif tools" in next reorg
+# needed by sites module for motif discovery (streme) and site scanning (fimo)
+ARG MEME_VER=5.5.9
+RUN apt-get update && apt-get install --no-install-recommends -y \
+    autoconf automake libtool libexpat1-dev zlib1g-dev && \
+    apt-get clean all
+RUN cpanm install HTML::Template HTML::Parser
+RUN wget https://meme-suite.org/meme/meme-software/${MEME_VER}/meme-${MEME_VER}.tar.gz && \
+    tar zxf meme-${MEME_VER}.tar.gz && \
+    cd meme-${MEME_VER} && \
+    ./configure --prefix=/opt/meme --enable-build-libxml2 --enable-build-libxslt && \
+    make -j4 && \
+    make install && \
+    cd / && rm -rf meme-${MEME_VER} meme-${MEME_VER}.tar.gz
+ENV PATH=/opt/meme/bin:$PATH
+
+#############################################################################################
+# tRNAscan-SE (+ Infernal)
+#############################################################################################
+
+# APPENDIX-ADDED 2026-06-04: relocate to "Sequence analysis / RNA tools" in next reorg
+# tRNA gene detection; Infernal must share the same install prefix (upstream INSTALL)
+ARG INFERNAL_VER=1.1.4
+ARG TRNASCAN_VER=v2.0.12
+RUN wget http://eddylab.org/infernal/infernal-${INFERNAL_VER}.tar.gz && \
+    tar zxf infernal-${INFERNAL_VER}.tar.gz && \
+    cd infernal-${INFERNAL_VER} && \
+    ./configure --prefix=/opt/trnascan-se && \
+    make -j$(nproc) && \
+    make install && \
+    cd / && rm -rf infernal-${INFERNAL_VER} infernal-${INFERNAL_VER}.tar.gz
+RUN git clone --branch ${TRNASCAN_VER} --single-branch https://github.com/UCSC-LoweLab/tRNAscan-SE.git /opt/trnascan-se-src && \
+    cd /opt/trnascan-se-src && \
+    autoreconf -fi && \
+    ./configure --prefix=/opt/trnascan-se && \
+    make && \
+    make install
+ENV PATH=/opt/trnascan-se/bin:$PATH
 
 #############################################################################################
 # image identity (kept last: version bumps only invalidate this tiny layer, not the whole image)

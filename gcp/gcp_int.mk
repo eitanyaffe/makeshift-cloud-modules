@@ -51,7 +51,7 @@ GCP_PLATFORM?=linux/amd64
 GCP_IMAGE_NAME?=$(GCP_IMAGE_BASE)-$(GCP_UBUNTU_VER)
 GCP_GCR_HOSTNAME?=gcr.io
 # image reference is version-tagged so each config pins a specific image (see
-# MAKESHIFT_PATTERNS.md §20). without the tag every pull resolved to :latest, causing silent
+# MAKESHIFT_PATTERNS.md §19). without the tag every pull resolved to :latest, causing silent
 # drift across configs that pin different GCP_IMAGE_VER values.
 GCP_GCR_IMAGE_PATH?=$(GCP_GCR_HOSTNAME)/$(GCP_PROJECT_ID)/$(GCP_IMAGE_NAME):$(GCP_IMAGE_VER)
 
@@ -60,7 +60,7 @@ GCP_CONTAINER_DIR?=$(_md)/containers/$(GCP_IMAGE_NAME)
 
 # mdocker image version: bump when the Dockerfile actually changes tool behavior
 # (see modules/dev/MAKESHIFT_PATTERNS.md sec 20 for the bump policy).
-GCP_IMAGE_VER?=v1.05
+GCP_IMAGE_VER?=v1.06
 
 GCP_DOCKERHUB_BASE?=eitanyaffe
 GCP_DOCKERHUB_IMAGE?=$(GCP_DOCKERHUB_BASE)/$(GCP_IMAGE_NAME):$(GCP_IMAGE_VER)
