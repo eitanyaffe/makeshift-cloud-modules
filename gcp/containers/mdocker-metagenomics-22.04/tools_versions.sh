@@ -169,6 +169,8 @@ print_cmd       tarball edirect     esearch -version
 print_cmd_grep  tarball streme      'Version'          streme --version
 print_cmd_grep  tarball fimo        'Version'          fimo --version
 print_cmd_grep  tarball infernal    'Infernal [0-9]'   cmscan -h
+print_cmd       tarball fastp       fastp --version
+print_cmd_grep  tarball seqtk       'Version:'         seqtk
 
 echo ""
 echo "# git clones (HEAD + nearest tag)"

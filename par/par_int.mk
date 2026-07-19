@@ -77,6 +77,10 @@ else
 PAR_MAKEOVERRIDES?=$(MAKEOVERRIDES)
 endif
 
+# size of each PAR_PARAMS chunk when par_tasks_complex runs locally. keeps the
+# command line under ARG_MAX; only relevant for PAR_TYPE=local.
+PAR_LOCAL_BATCH_SIZE?=100
+
 #PAR_DROP_PARAMS=^m$$ ^DRY$$ ^DUMMY$$ ^PAR_
 PAR_DROP_PARAMS=^m$$ ^DRY$$ ^DUMMY$$ ^TOP_WAIT$$
 

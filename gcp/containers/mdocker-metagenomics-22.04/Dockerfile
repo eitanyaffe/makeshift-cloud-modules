@@ -652,6 +652,30 @@ RUN git clone --branch ${TRNASCAN_VER} --single-branch https://github.com/UCSC-L
 ENV PATH=/opt/trnascan-se/bin:$PATH
 
 #############################################################################################
+# fastp
+#############################################################################################
+
+# APPENDIX-ADDED 2026-07-02: relocate to "Read QC / preprocessing" in next reorg
+# fastq preprocessing / adapter trimming / QC
+# pinned: opengene.org hosts a per-version binary (fastp.<ver>) alongside the rolling "fastp" URL;
+# GitHub releases publish source only (no binary assets), so we use the upstream binary host.
+ARG FASTP_VER=1.3.6
+RUN wget https://opengene.org/fastp/fastp.${FASTP_VER} -O /usr/local/bin/fastp && \
+    chmod +x /usr/local/bin/fastp
+
+#############################################################################################
+# seqtk
+#############################################################################################
+
+# APPENDIX-ADDED 2026-07-04: relocate near samtools/fastp (fasta/fastq utilities) in next reorg
+# lightweight FASTA/FASTQ toolkit (subseq, sample, trimfq, comp, ...); heng li
+ARG SEQTK_VER=1.4
+RUN git clone --branch v${SEQTK_VER} --single-branch https://github.com/lh3/seqtk.git /opt/seqtk && \
+    cd /opt/seqtk && \
+    make && \
+    cp seqtk /usr/local/bin/seqtk
+
+#############################################################################################
 # image identity (kept last: version bumps only invalidate this tiny layer, not the whole image)
 #############################################################################################
 

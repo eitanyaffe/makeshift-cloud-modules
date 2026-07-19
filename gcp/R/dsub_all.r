@@ -861,7 +861,7 @@ dsub.ms.tasks.batch=function(task.odir.vals, task.item.vals, batch.size, ...)
         dsub.ms.tasks(task.odir.vals=task.odir.vals, task.item.vals=task.item.vals, batch.index=0, ...)
     } else {
         N.batches = ceiling(N / batch.size)
-        ss = split(1:N, cut(1:10, N.batches))
+        ss = split(1:N, cut(1:N, N.batches))
         for (i in 1:length(ss)) {
             ii = ss[[i]]
             cat(sprintf(">>> processing batch %d/%d, number of tasks: %d\n", i, length(ss), length(ii)))
@@ -1073,11 +1073,11 @@ dsub.ms.complex.batch=function(task.input.table, task.odir.vals, batch.size, ...
         dsub.ms.complex(df.tasks=df.tasks, task.odir.vals=task.odir.vals, batch.index=0, ...)
     } else {
         N.batches = ceiling(N / batch.size)
-        ss = split(1:N, cut(1:10, N.batches))
+        ss = split(1:N, cut(1:N, N.batches))
         for (i in 1:length(ss)) {
             ii = ss[[i]]
             cat(sprintf(">>> processing batch %d/%d, number of tasks: %d\n", i, length(ss), length(ii)))
-            dsub.ms.complex(df.tasks=df.tasks[ii,], task.odir.vals=task.odir.vals[ii], batch.index=i, ...)
+            dsub.ms.complex(df.tasks=df.tasks[ii, , drop=FALSE], task.odir.vals=task.odir.vals[ii], batch.index=i, ...)
         }
     }
 }

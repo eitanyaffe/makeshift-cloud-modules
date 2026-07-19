@@ -142,11 +142,13 @@ par_tasks_table:
 		PAR_TASK_ITEM_VALS="$(call _get_field,$(PAR_TASK_ITEM_TABLE),$(PAR_TASK_ITEM_FIELD))"
 
 par_tasks_complex_local:
+	@[ -n "$(PAR_PARAMS)" ] || { echo "error: par_tasks_complex_local received empty PAR_PARAMS (bad PAR_TASK_ITEM_VAR, empty table, or failed table_batch.pl)"; exit 1; }
 	$(foreach X,$(PAR_PARAMS),$(MAKE) m=$(PAR_MODULE) $(PAR_TARGET) $(subst :,$(__space),$X); $(ASSERT);)
 
 par_tasks_complex:
-	$(MAKE) par_tasks_complex_local \
-		PAR_PARAMS="$(call _get_params,$(PAR_TASK_ITEM_TABLE),$(PAR_TASK_ITEM_VAR))"
+	$(foreach B,$(shell seq 1 $(call _get_params_count,$(PAR_TASK_ITEM_TABLE),$(PAR_LOCAL_BATCH_SIZE))), \
+		$(MAKE) par_tasks_complex_local \
+			PAR_PARAMS="$(call _get_params_batch,$(PAR_TASK_ITEM_TABLE),$(PAR_TASK_ITEM_VAR),$(PAR_LOCAL_BATCH_SIZE),$B)" ; $(ASSERT); )
 
 par_direct_local:
 	$(foreach i,$(PAR_DIRECT_IFN_VARS),cp $($i) /tmp/$i;)
