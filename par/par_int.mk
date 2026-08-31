@@ -81,6 +81,14 @@ endif
 # command line under ARG_MAX; only relevant for PAR_TYPE=local.
 PAR_LOCAL_BATCH_SIZE?=100
 
+# run only the first task of every local fan-out instead of all of them; only
+# relevant for PAR_TYPE=local. intended for dry runs (make plan), where walking
+# a whole item table costs minutes and teaches nothing the first task does not.
+# because it lives in par, it truncates every nesting level at once, so a
+# caller needs to know nothing about the module's item tables. a truncated run
+# announces itself on stdout, so a saved plan carries its own provenance.
+PAR_LOCAL_RUN_ONLY_FIRST_TASK?=F
+
 #PAR_DROP_PARAMS=^m$$ ^DRY$$ ^DUMMY$$ ^PAR_
 PAR_DROP_PARAMS=^m$$ ^DRY$$ ^DUMMY$$ ^TOP_WAIT$$
 

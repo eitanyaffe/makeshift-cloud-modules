@@ -1,3 +1,4 @@
 
 gcp/containers/mdocker-metagenomics/Dockerfile_test
+gcp/specify_work_dir/
 .DS_Store

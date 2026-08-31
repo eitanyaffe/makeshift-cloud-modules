@@ -131,11 +131,22 @@ par_delete_find:
 		GCP_REMOVE_NAME_PATTERN="$(PAR_REMOVE_NAME_PATTERN)"
 
 else
+
+# every local fan-out below passes its task list through _par_tasks, so
+# PAR_LOCAL_RUN_ONLY_FIRST_TASK truncates all nesting levels at once. $(info)
+# is used rather than a recipe echo because it also prints under make -n, which
+# is the case that matters: a saved dry run must record that it was truncated.
+ifeq ($(PAR_LOCAL_RUN_ONLY_FIRST_TASK),T)
+_par_tasks=$(if $(word 2,$1),$(info PAR_LOCAL_RUN_ONLY_FIRST_TASK=T: $(PAR_NAME) truncated to first of $(words $1) tasks))$(firstword $1)
+else
+_par_tasks=$1
+endif
+
 par:
 	$(MAKE) m=$(PAR_MODULE) $(PAR_TARGET)
 
 par_tasks:
-	$(foreach X,$(PAR_TASK_ITEM_VALS),$(MAKE) m=$(PAR_MODULE) $(PAR_TARGET) $(PAR_TASK_ITEM_VAR)=$X; $(ASSERT);)
+	$(foreach X,$(call _par_tasks,$(PAR_TASK_ITEM_VALS)),$(MAKE) m=$(PAR_MODULE) $(PAR_TARGET) $(PAR_TASK_ITEM_VAR)=$X; $(ASSERT);)
 
 par_tasks_table:
 	$(MAKE) m=par par_tasks \
@@ -143,10 +154,10 @@ par_tasks_table:
 
 par_tasks_complex_local:
 	@[ -n "$(PAR_PARAMS)" ] || { echo "error: par_tasks_complex_local received empty PAR_PARAMS (bad PAR_TASK_ITEM_VAR, empty table, or failed table_batch.pl)"; exit 1; }
-	$(foreach X,$(PAR_PARAMS),$(MAKE) m=$(PAR_MODULE) $(PAR_TARGET) $(subst :,$(__space),$X); $(ASSERT);)
+	$(foreach X,$(call _par_tasks,$(PAR_PARAMS)),$(MAKE) m=$(PAR_MODULE) $(PAR_TARGET) $(subst :,$(__space),$X); $(ASSERT);)
 
 par_tasks_complex:
-	$(foreach B,$(shell seq 1 $(call _get_params_count,$(PAR_TASK_ITEM_TABLE),$(PAR_LOCAL_BATCH_SIZE))), \
+	$(foreach B,$(call _par_tasks,$(shell seq 1 $(call _get_params_count,$(PAR_TASK_ITEM_TABLE),$(PAR_LOCAL_BATCH_SIZE)))), \
 		$(MAKE) par_tasks_complex_local \
 			PAR_PARAMS="$(call _get_params_batch,$(PAR_TASK_ITEM_TABLE),$(PAR_TASK_ITEM_VAR),$(PAR_LOCAL_BATCH_SIZE),$B)" ; $(ASSERT); )
 
