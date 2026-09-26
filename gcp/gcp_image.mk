@@ -11,9 +11,10 @@ mdocker:
 		$(GCP_CONTAINER_DIR)
 	docker tag $(GCP_IMAGE_NAME) $(GCP_GCR_IMAGE_PATH)
 
-# push image to GCR
+# push image to GCR as the SA (not as user), so pushes don't need user reauth
 mdocker_push:
-	docker push $(GCP_GCR_IMAGE_PATH)
+	gcloud auth activate-service-account $(GCP_PUSH_ACCOUNT) --key-file=$(GCP_KEY_FILE) --quiet
+	CLOUDSDK_CORE_ACCOUNT=$(GCP_PUSH_ACCOUNT) docker push $(GCP_GCR_IMAGE_PATH)
 
 # push image to dockerhub
 mdocker_push_dc:

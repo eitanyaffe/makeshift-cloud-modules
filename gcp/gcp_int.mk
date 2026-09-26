@@ -55,12 +55,16 @@ GCP_GCR_HOSTNAME?=gcr.io
 # drift across configs that pin different GCP_IMAGE_VER values.
 GCP_GCR_IMAGE_PATH?=$(GCP_GCR_HOSTNAME)/$(GCP_PROJECT_ID)/$(GCP_IMAGE_NAME):$(GCP_IMAGE_VER)
 
+# service account used for pushing mdocker to GCR. keeps pushes working across
+# stanford workspace reauth expiries (user tokens expire; SA tokens don't).
+GCP_PUSH_ACCOUNT?=makeshift@$(GCP_PROJECT_ID).iam.gserviceaccount.com
+
 # per-image assets (Dockerfile, entrypoint scripts, tools_versions.sh, etc.)
 GCP_CONTAINER_DIR?=$(_md)/containers/$(GCP_IMAGE_NAME)
 
 # mdocker image version: bump when the Dockerfile actually changes tool behavior
 # (see modules/dev/MAKESHIFT_PATTERNS.md sec 20 for the bump policy).
-GCP_IMAGE_VER?=v1.06
+GCP_IMAGE_VER?=v1.08
 
 GCP_DOCKERHUB_BASE?=eitanyaffe
 GCP_DOCKERHUB_IMAGE?=$(GCP_DOCKERHUB_BASE)/$(GCP_IMAGE_NAME):$(GCP_IMAGE_VER)
@@ -245,6 +249,32 @@ GCP_DSUB_DIRECT_COMMAND?=command
 
 # typically save job stats but some images don't have nproc or getconf
 DSUB_SAVE_JOB_STATS?=$(PAR_SAVE_JOB_STATS)
+
+###############################################################################################
+# batch job cleanup
+###############################################################################################
+
+# batch keeps finished job records forever, and every list/poll call pages over all of
+# them, so job submission and dstat get slower over time. jobs_clean removes the records
+# of finished jobs (bucket data and logs are untouched).
+
+# job states that are done and can be discarded. the states are selected locally and not
+# through a gcloud --filter, which evaluates client-side anyway and costs ~25% throughput
+GCP_JOBS_CLEAN_STATES?=SUCCEEDED FAILED CANCELLED
+
+# jobs fetched per api call. the gcloud default of 100 is about half as fast as 500+
+GCP_JOBS_CLEAN_PAGE_SIZE?=1000
+
+# concurrent delete workers. deletes are throttled by the api write quota, and pushing
+# past it only produces http 429 and reset connections, so keep this modest. at this
+# rate clearing a large backlog takes hours, which is fine since it runs unattended
+GCP_JOBS_CLEAN_PARALLEL?=16
+
+# all jobs and their states, as listed
+GCP_JOBS_CLEAN_RAW?=/tmp/gcp_jobs_all_$(GCP_PROJECT_ID).txt
+
+# the (location, job) pairs selected for deletion
+GCP_JOBS_CLEAN_LIST?=/tmp/gcp_jobs_clean_$(GCP_PROJECT_ID).txt
 
 ###############################################################################################
 # remove files and dirs

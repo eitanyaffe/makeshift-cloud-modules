@@ -258,6 +258,39 @@ jobs_all:
 	gcloud batch jobs list \
 	  --project relman-yaffe
 
+# delete the records of finished jobs, project-wide. jobs still in flight are kept, since
+# deleting a running job terminates it. the location comes from each job name, since jobs
+# can live outside GCP_REGION. the confirmation comes first, as the listing takes minutes
+jobs_clean:
+	@echo "about to delete the records of all finished jobs of project $(GCP_PROJECT_ID)"; \
+	printf "proceed? [y/N] "; \
+	read -r answer; \
+	case "$$answer" in \
+		y|Y) ;; \
+		*) echo "aborted, no jobs deleted"; exit 0 ;; \
+	esac; \
+	gcloud auth activate-service-account --key-file=$(GCP_KEY_FILE) --quiet; \
+	echo "listing all jobs, this takes a few minutes ..."; \
+	gcloud batch jobs list \
+		--project=$(GCP_PROJECT_ID) \
+		--page-size=$(GCP_JOBS_CLEAN_PAGE_SIZE) \
+		--format="value(name,status.state)" > $(GCP_JOBS_CLEAN_RAW) \
+		|| { echo "error: listing jobs failed"; exit 1; }; \
+	awk -F'\t' -v states="$(GCP_JOBS_CLEAN_STATES)" \
+		'BEGIN { n = split(states, s, " "); for (i = 1; i <= n; i++) keep[s[i]] = 1 } \
+		 keep[$$2] { k = split($$1, p, "/"); print p[k-2], p[k] }' \
+		$(GCP_JOBS_CLEAN_RAW) > $(GCP_JOBS_CLEAN_LIST); \
+	total=$$(wc -l < $(GCP_JOBS_CLEAN_RAW) | tr -d ' '); \
+	count=$$(wc -l < $(GCP_JOBS_CLEAN_LIST) | tr -d ' '); \
+	echo "found $$total jobs, $$count of them finished"; \
+	if [ $$count -eq 0 ]; then echo "nothing to delete"; exit 0; fi; \
+	echo "deleting $$count jobs, this takes hours for a large backlog ..."; \
+	xargs -n2 -P$(GCP_JOBS_CLEAN_PARALLEL) sh -c \
+		'gcloud batch jobs delete "$$1" --location="$$0" --project=$(GCP_PROJECT_ID) --quiet' \
+		< $(GCP_JOBS_CLEAN_LIST) \
+		|| { echo "error: some deletes failed, rerun to retry them"; exit 1; }; \
+	echo "deleted $$count jobs"
+
 #########################################################################################################
 # check dsub tasks
 #########################################################################################################

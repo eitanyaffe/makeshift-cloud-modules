@@ -143,7 +143,9 @@ print_apt bwa samtools prodigal hmmer fasttree mafft bedtools lftp clustalo arag
     lbzip2 pigz time bc curl wget git sudo screen less rsync locate valgrind \
     bash-completion x11-apps fuse apt-transport-https ca-certificates gnupg gnupg2 \
     libswitch-perl cpanminus lsb-release uuid-runtime \
-    python2 python2-dev build-essential
+    python2 python2-dev build-essential \
+    texlive-latex-base texlive-latex-recommended texlive-fonts-recommended \
+    texlive-xetex lmodern
 
 echo ""
 echo "# release tarballs / precompiled binaries"
@@ -171,6 +173,9 @@ print_cmd_grep  tarball fimo        'Version'          fimo --version
 print_cmd_grep  tarball infernal    'Infernal [0-9]'   cmscan -h
 print_cmd       tarball fastp       fastp --version
 print_cmd_grep  tarball seqtk       'Version:'         seqtk
+print_cmd_grep  tarball pdflatex    'pdfTeX'           pdflatex --version
+print_cmd_grep  tarball xelatex     'XeTeX'            xelatex --version
+print_cmd       deb     pandoc      pandoc --version
 
 echo ""
 echo "# git clones (HEAD + nearest tag)"
@@ -182,6 +187,16 @@ print_git hifiasm-meta  /hifiasm-meta
 print_git Bracken       /opt/bracken
 print_git drep          /opt/drep
 print_git trnascan-se   /opt/trnascan-se-src
+
+echo ""
+echo "# local patches applied to third-party sources (see Dockerfile)"
+GB=$(python3 -c 'import dsub.providers.google_batch as m; print(m.__file__)' 2>/dev/null)
+GU=$(python3 -c 'import dsub.providers.google_utils as m; print(m.__file__)' 2>/dev/null)
+n=$(grep -c '( gcloud_cp .* ) || true' "$GB" 2>/dev/null)
+[ "$n" = 3 ] && state="applied (3 log copies serialized)" || state="MISSING (found ${n:-0}/3)"
+printf "$FMT" patch dsub-serial-log-upload "$state"
+printf "$FMT" patch dsub-cloud-sdk-image \
+    "$(grep -oE 'cloudsdktool/cloud-sdk:[0-9.]+-slim' "$GU" 2>/dev/null | head -1)"
 
 echo ""
 echo "# python (pip) packages (venv at /opt/venv)"

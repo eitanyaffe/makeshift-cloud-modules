@@ -2,6 +2,84 @@
 
 Newest-first. Each stanza covers the `GCP_IMAGE_VER` label in the heading. For deeper context see git history and the `details.txt` snapshots under `gs://${GCP_PROJECT_ID}-image-tool-versions/mdocker-metagenomics-22.04/vX.YY/{dsub,local}/`.
 
+## v1.08 — 2026-09-07 (mode: mode-2-add)
+
+Patch dsub's continuous log-uploader so a failed log upload can no longer mark
+a healthy Batch task FAILED. On v1.07 a 6-hour GTDB batch task finished its
+work and delocalized every output, yet Batch reported the task FAILED; `dsub
+--wait` propagated that to the coordinator, which then deleted the job's
+healthy sibling tasks and retried the whole thing.
+
+Root cause is in dsub's `_LOG_CP` bash (`providers/google_batch.py`), which
+launches three `gcloud storage cp` calls in parallel and `wait`s on each under
+`set -o errexit`. Google documents that parallel gcloud invocation is
+unsupported — the processes share `~/.config/gcloud/access_tokens.db` and race
+on its sqlite lock (`WARNING: Could not store access token in cache: database
+is locked`, then `ERROR: gcloud crashed (OperationalError)`). dsub's 4-attempt
+retry exhausted itself on the hot lock, `gcloud_cp` hit its `exit 1`, and since
+the uploader is a background runnable that dsub does not mark
+`ignore_exit_status`, Batch failed the whole task.
+
+This is a v1.07 regression in the sense that it was unreachable before: dsub
+0.5.1 did these copies with `gsutil`, which does not use gcloud's sqlite token
+cache. The 0.5.3 `gsutil` → `gcloud storage` migration made dsub's pre-existing
+parallelism unsafe. The `294.0.0-slim` → `583.0.0-slim` wrapper bump is not the
+cause and was not optional — `gcloud storage` does not exist in 294.0.0.
+
+### local patches
+- New `dsub_logging_patch.py`, applied to the installed dsub after
+  `pip install`. Serializes the three log copies and wraps each as
+  `( gcloud_cp ... ) || true`. The subshell is required, not cosmetic: dsub's
+  `gcloud_cp` ends in `exit 1`, which without `&` to contain it would kill the
+  logging loop outright, and `|| true` does not stop `exit`.
+- The script pins `EXPECTED_DSUB_VER=0.5.4` and asserts it finds exactly
+  3 launches / 3 pid vars / 3 waits, so a dsub bump fails the build instead of
+  silently shipping an unpatched image. It is idempotent and syntax-checks the
+  result before writing.
+
+### tools_versions.sh
+- New `# local patches` section reporting `dsub-serial-log-upload`
+  (`applied (3 log copies serialized)` vs `MISSING (found N/3)`) and the
+  effective `dsub-cloud-sdk-image` tag, so `details.txt` shows patch state.
+
+### operational notes
+- DB rebuild required: no.
+- Denv restart required: yes, to pick up v1.08.
+- Rebuild cost: the `COPY dsub_logging_patch.py` sits just after the dsub
+  install, so everything below reuses cache and everything above it rebuilds.
+- Config bumps: `modules/cloud/gcp/gcp_int.mk` → `GCP_IMAGE_VER?=v1.08`.
+- Verify after build: `mdocker_tools_versions` should show
+  `patch  dsub-serial-log-upload  applied (3 log copies serialized)`.
+
+## v1.07 — 2026-09-01 (mode: mode-3-upgrade)
+
+Unblock dsub: bump dsub v0.5.1 → v0.5.4 and patch its hardcoded cloud-sdk
+wrapper image pin from a Google-pruned tag to a currently-published one. Every
+`dsub`-launched Batch task on v1.06 was failing at wrapper image pull with
+`RUNNING → FAILED exit 1` and no log upload, because dsub 0.5.1's
+`google_utils.py:CLOUD_SDK_IMAGE` pins
+`gcr.io/google.com/cloudsdktool/cloud-sdk:294.0.0-slim`, which Google removed
+from gcr.io. v0.5.4's own pin (`499.0.0-slim`) is also already pruned, hence
+the sed to `583.0.0-slim` (the current published tag).
+
+### pinned-tool changes
+- dsub (git clone): `v0.5.1` → `v0.5.4`. Completes the `gsutil` →
+  `gcloud storage` migration in dsub's own wrapper bash (log-upload,
+  input-localize, output-delocalize runnables that Batch runs in the cloud-sdk
+  image). Does not affect user `gsutil` calls in `modules/cloud/gcp/*.mk`.
+- cloud-sdk wrapper image (patched, not a Dockerfile pin): `294.0.0-slim` →
+  `583.0.0-slim`. This is Google's public helper image pulled by Batch on the
+  cloud VM; not baked into mdocker. Bump the sed's RHS when Google prunes
+  583.0.0 too — check with
+  `gcloud container images list-tags gcr.io/google.com/cloudsdktool/cloud-sdk`.
+
+### operational notes
+- DB rebuild required: no.
+- Denv restart required: yes, to pick up v1.07.
+- Rebuild cost: one changed layer at the `dsub` install; everything below the
+  dsub layer reuses cache, everything above rebuilds from that point.
+- Config bumps: `modules/cloud/gcp/gcp_int.mk` → `GCP_IMAGE_VER?=v1.07`.
+
 ## v1.03 — 2026-04-22 (mode: mode-2-add)
 
 Added the `qrcode` R package. No pinned-tool version changes, no reorg.

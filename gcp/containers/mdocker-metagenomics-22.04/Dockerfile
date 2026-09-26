@@ -136,9 +136,24 @@ RUN curl -L -O https://github.com/GoogleCloudPlatform/gcsfuse/releases/download/
 # Install google-cloud-batch in venv
 RUN $VENV_PIP install google-cloud-batch==0.17.20
 
-# Clone dsub and install in venv (pinned to tag v0.5.1)
-RUN git clone --branch v0.5.1 --single-branch https://github.com/DataBiosphere/dsub /dsub && \
+# Clone dsub and install in venv (pinned to tag v0.5.4; gcloud-storage-migrated).
+# Patch the hardcoded cloud-sdk wrapper image tag: Google prunes old tags from
+# gcr.io aggressively, and dsub 0.5.4 ships pinned to 499.0.0-slim which is
+# already gone. When Batch tasks start failing at wrapper image pull, bump the
+# right-hand tag below to a currently-published <SDK>-slim tag from
+#   gcloud container images list-tags gcr.io/google.com/cloudsdktool/cloud-sdk
+RUN git clone --branch v0.5.4 --single-branch https://github.com/DataBiosphere/dsub /dsub && \
+    sed -i "s|cloudsdktool/cloud-sdk:499.0.0-slim|cloudsdktool/cloud-sdk:583.0.0-slim|" \
+        /dsub/dsub/providers/google_utils.py && \
     cd /dsub && $VENV_PIP install .
+
+# Serialize dsub's three parallel log uploads and make each one non-fatal.
+# Parallel gcloud invocation is unsupported (they race on the sqlite token
+# cache), and the uploader is a background runnable without ignore_exit_status,
+# so its failure marked whole Batch tasks FAILED hours after the user command
+# had succeeded. The script fails the build if upstream no longer matches.
+COPY dsub_logging_patch.py /usr/local/share/dsub_logging_patch.py
+RUN python3 /usr/local/share/dsub_logging_patch.py
 
 #############################################################################################
 # megahit
@@ -674,6 +689,35 @@ RUN git clone --branch v${SEQTK_VER} --single-branch https://github.com/lh3/seqt
     cd /opt/seqtk && \
     make && \
     cp seqtk /usr/local/bin/seqtk
+
+#############################################################################################
+# tex -> pdf (pdflatex)
+#############################################################################################
+
+# APPENDIX-ADDED 2026-09-03: relocate to "document rendering / manuscript" in next reorg
+# lean texlive: enough to render the body-only paper.tex / full.tex emitted by
+# modules/utils/manuscript/py/methods_to_tex.py (subsection, itemize, enumerate,
+# tabular, quote, texttt/textbf/textit, standard math escapes). no fontspec,
+# no biblatex, no tikz — bump to texlive-latex-extra if the preambles grow.
+RUN apt-get update && apt-get install --no-install-recommends -y \
+        texlive-latex-base texlive-latex-recommended texlive-fonts-recommended \
+        texlive-xetex lmodern && \
+    apt-get clean all && rm -rf /var/lib/apt/lists/*
+
+#############################################################################################
+# pandoc
+#############################################################################################
+
+# APPENDIX-ADDED 2026-09-18: relocate to "document rendering / manuscript" in next reorg
+# renders citation-aware manuscript PDFs from Markdown and CSL JSON
+ARG PANDOC_VER=3.11
+ARG PANDOC_SHA256=89d4c9d97818c62a97157f0072844e4602c6cee795bf84abd1aee7273abcda99
+RUN wget -q https://github.com/jgm/pandoc/releases/download/${PANDOC_VER}/pandoc-${PANDOC_VER}-1-amd64.deb \
+        -O /tmp/pandoc.deb && \
+    echo "${PANDOC_SHA256}  /tmp/pandoc.deb" | sha256sum -c - && \
+    apt-get update && apt-get install --no-install-recommends -y /tmp/pandoc.deb && \
+    rm -f /tmp/pandoc.deb && \
+    apt-get clean all && rm -rf /var/lib/apt/lists/*
 
 #############################################################################################
 # image identity (kept last: version bumps only invalidate this tiny layer, not the whole image)

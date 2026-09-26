@@ -23,6 +23,55 @@ path2bucket=function(path, out.bucket, base.mount)
     }
 }
 
+# retry a bucket command that must succeed. a single transient error (metadata
+# 503 while refreshing the access token, 5xx from the storage API) is otherwise
+# enough to abort a task, since callers stop on a non-zero return code.
+# not for queries such as gsutil ls, which return non-zero when nothing matched.
+gsutil.retry=function(command, max.attempts=5, sleep.base=5, intern=F)
+{
+    output = NULL
+    for (attempt in 1:max.attempts) {
+        if (intern) {
+            output = suppressWarnings(system(command, intern=T))
+            rc = attr(output, "status")
+            if (is.null(rc)) rc = 0
+        } else {
+            rc = system(command)
+        }
+        if (rc == 0)
+            return (list(rc=0, output=output))
+        if (attempt == max.attempts)
+            break
+        sleep.s = sleep.base * 2^(attempt-1)
+        cat(sprintf(">>> command failed (rc=%d), attempt %d/%d, retrying in %ds: %s\n",
+                    rc, attempt, max.attempts, sleep.s, command))
+        Sys.sleep(sleep.s)
+    }
+    list(rc=rc, output=output)
+}
+
+# remove GCS folder-placeholder objects at (and under) each ODIR before dsub
+# delocalization. gcloud storage rsync (dsub 0.5.3+) fails with "matched more
+# than one URL" when the destination has a zero-byte object literally named
+# "foo/" alongside real objects with the "foo/" prefix. gcsfuse's mkdir (used
+# by _start on fuse-mounted paths in local runs) plants such placeholders at
+# every ancestor level, so the sweep is recursive to catch nested ones too.
+# we detect placeholders by the generation-suffix form (path ending in
+# "/#<digits>") and remove only that exact generation; real objects nested
+# under the prefix (path/x, path/y/z) are never touched.
+remove.odir.placeholders=function(paths)
+{
+    for (p in paths) {
+        p = sub("/+$", "", p)
+        listing = suppressWarnings(system(sprintf("gsutil ls -a -r '%s/**' 2>/dev/null", p), intern=T))
+        placeholders = grep("/#[0-9]+$", listing, value=T)
+        for (ph in placeholders) {
+            cat(sprintf(">>> removing GCS folder placeholder: %s\n", ph))
+            system(sprintf("gsutil rm '%s'", ph))
+        }
+    }
+}
+
 rnd.label=function(len=10) {
     vals = c(1:10, letters)
     N = length(vals)
@@ -257,7 +306,7 @@ save.job.key.file=function(ofn, ofn.bucket, job.keys, dry)
     # copy to bucket
     command  = paste("gsutil -mq cp", ofn, ofn.bucket)
     # cat(sprintf("saving job key file to GCS using command: %s\n", command))
-    if (system(command) != 0)
+    if (gsutil.retry(command)$rc != 0)
         stop(sprintf("failed running command: %s\n", command))
 }
 
@@ -414,9 +463,17 @@ dsub.should.retry=function(dsub.output)
 {
     if (length(dsub.output) == 0)
         return(FALSE)
-    
-    retry.patterns = c("StatusCode.ALREADY_EXISTS")
-    
+
+    # transient GCP/Batch API errors seen from dsub's own --wait polling loop.
+    # DeadlineExceeded/504 has aborted long-running L4 batches near completion;
+    # we must ddel the still-running task before re-submitting (see caller).
+    retry.patterns = c(
+        "StatusCode.ALREADY_EXISTS",
+        "DeadlineExceeded",
+        "UNAVAILABLE",
+        "google.api_core.exceptions"
+    )
+
     for (pattern in retry.patterns) {
         if (any(grepl(pattern, dsub.output, ignore.case=TRUE, fixed=FALSE)))
             return(TRUE)
@@ -451,8 +508,13 @@ dsub.run.with.wait=function(command, job.keys, project, provider, ms.level)
             
             if (!dsub.should.retry(dsub.output))
                 break
-            
-            cat(">>> retryable failure detected, waiting 60 seconds before retry\n")
+
+            # transient dsub polling failure may leave the task RUNNING on Batch;
+            # ddel by the current job key before re-submit so we don't fork a duplicate.
+            cat(">>> retryable failure detected, ddel'ing orphan tasks before retry\n")
+            delete.subtree.tasks(project=project, provider=provider, ms.level=ms.level,
+                                 job.key=job.keys[length(job.keys)])
+            cat(">>> waiting 60 seconds before retry\n")
             Sys.sleep(60)
             attempt = attempt + 1
         }
@@ -839,6 +901,8 @@ dsub.ms=function(job.work.dir,
         command  = paste0(command,
                           " --mount ", mount.bucket.vars[i], "=", mount.buckets[i])
     
+    if (!dry) remove.odir.placeholders(c(out.path))
+
     dsub.run(command=command, dry=dry, wait=wait, 
              project=project, provider=provider, region=dbase$region,
              job.keys=job.keys, ms.level=ms.level, log.basedir=log.basedir,
@@ -1050,6 +1114,8 @@ dsub.ms.tasks=function(job.work.dir,
     for (i in 1:length(mount.buckets))
         command  = paste0(command,
                           " --mount ", mount.bucket.vars[i], "=", mount.buckets[i])
+
+    if (!dry) remove.odir.placeholders(out.paths)
 
     dsub.run(command=command, dry=dry, wait=wait,
              project=project, provider=provider, region=dbase$region,
@@ -1264,6 +1330,8 @@ dsub.ms.complex=function(job.work.dir,
         command  = paste0(command,
                           " --mount ", mount.bucket.vars[i], "=", mount.buckets[i])
 
+    if (!dry) remove.odir.placeholders(out.paths)
+
     dsub.run(command=command, dry=dry, wait=wait,
              project=project, provider=provider, region=dbase$region,
              job.keys=job.keys, ms.level=ms.level, log.basedir=log.basedir,
@@ -1411,10 +1479,12 @@ dsub.direct=function(job.work.dir,
         dsub.command  = paste0(dsub.command,
                                " --output ", ofn.vars[i], "=", obucket)
     }
+    all.odir.paths = c(out.path)
     for (i in 1:length(odir.vars)) {
         if (is.na(odir.paths[i]) || odir.paths[i] == "NA")
             next
         obucket = path2bucket(path=odir.paths[i], out.bucket=out.bucket, base.mount=base.mount)
+        all.odir.paths = c(all.odir.paths, obucket)
         dsub.command  = paste0(dsub.command,
                                " --output-recursive ", odir.vars[i], "=", obucket)
     }
@@ -1427,6 +1497,8 @@ dsub.direct=function(job.work.dir,
     # !!! make this a parameter
     # dsub.command = paste(dsub.command, "--accelerator-type nvidia-tesla-t4 --accelerator-count 1")
     # dsub.command = paste(dsub.command, "--accelerator-type nvidia-h100-80gb --accelerator-count 1")
+
+    if (!dry) remove.odir.placeholders(all.odir.paths)
 
     dsub.run(command=dsub.command, dry=dry, wait=wait, 
              project=project, provider=provider, region=dbase$region,
