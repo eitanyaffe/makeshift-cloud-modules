@@ -168,9 +168,9 @@ print_cmd_grep  tarball gcloud      'Google Cloud SDK' gcloud --version
 print_cmd_grep  tarball blast+      'blastn:'          blastn -version
 print_cmd_grep  tarball kraken2     'version'          kraken2 --version
 print_cmd       tarball edirect     esearch -version
-print_cmd_grep  tarball streme      'Version'          streme --version
-print_cmd_grep  tarball fimo        'Version'          fimo --version
-print_cmd_grep  tarball infernal    'Infernal [0-9]'   cmscan -h
+print_cmd_grep  tarball streme      '^[0-9]+\.[0-9]+'  streme --version
+print_cmd_grep  tarball fimo        '^[0-9]+\.[0-9]+'  fimo --version
+print_cmd_grep  tarball infernal    'INFERNAL [0-9]'   cmscan -h
 print_cmd       tarball fastp       fastp --version
 print_cmd_grep  tarball seqtk       'Version:'         seqtk
 print_cmd_grep  tarball pdflatex    'pdfTeX'           pdflatex --version
@@ -195,6 +195,9 @@ GU=$(python3 -c 'import dsub.providers.google_utils as m; print(m.__file__)' 2>/
 n=$(grep -c '( gcloud_cp .* ) || true' "$GB" 2>/dev/null)
 [ "$n" = 3 ] && state="applied (3 log copies serialized)" || state="MISSING (found ${n:-0}/3)"
 printf "$FMT" patch dsub-serial-log-upload "$state"
+n=$(grep -c '^ *allocation_policy.labels = labels$' "$GB" 2>/dev/null)
+[ "$n" = 1 ] && state="applied (labels on allocation policy)" || state="MISSING (found ${n:-0}/1)"
+printf "$FMT" patch dsub-vm-labels "$state"
 printf "$FMT" patch dsub-cloud-sdk-image \
     "$(grep -oE 'cloudsdktool/cloud-sdk:[0-9.]+-slim' "$GU" 2>/dev/null | head -1)"
 

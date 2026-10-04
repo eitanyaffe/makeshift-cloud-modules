@@ -2,6 +2,65 @@
 
 Newest-first. Each stanza covers the `GCP_IMAGE_VER` label in the heading. For deeper context see git history and the `details.txt` snapshots under `gs://${GCP_PROJECT_ID}-image-tool-versions/mdocker-metagenomics-22.04/vX.YY/{dsub,local}/`.
 
+## v1.09 — 2026-10-04 (mode: mode-3-reorg)
+
+Label dsub's Batch VMs so billing reports can group by `job-name` and the
+`ms-*` labels again, and reorganize the Dockerfile into topical sections.
+
+Since the move from `google-cls-v2` to `google-batch`, dsub 0.5.4 puts its
+labels (`job-name`, `job-id`, `user-id`, `task-id`, every `--label`) only on
+`Job.labels`, which Batch applies to the job and its log entries, not to the
+Compute Engine resources it creates. Only `AllocationPolicy.labels` reaches
+VMs and disks, which is what billing sees. Verified on a v1.09 test job: the
+VM carries `job-name`, `job-id`, `user-id`, `dsub-version` and
+`ms-project-name` next to Batch's own labels.
+
+### local patches
+- New `dsub_labels_patch.py`: after `build_allocation_policy(...)` in
+  `providers/google_batch.py`, adds `allocation_policy.labels = labels`. Pins
+  `EXPECTED_DSUB_VER=0.5.4`, asserts exactly one call site and that `labels`
+  is built before it; idempotent; syntax-checks before writing.
+- Labels only appear on jobs submitted from a v1.09 container (the patch is in
+  the submitting dsub), so the user's denv must run v1.09 too.
+
+### pinned-tool changes
+- sourmash/sendgrid step: `PIP_CONSTRAINT` → `PIP_BUILD_CONSTRAINT`. The reorg
+  invalidated the cached `pip install --upgrade pip` layer, pulling pip 26,
+  which no longer applies `PIP_CONSTRAINT` to isolated build envs; screed
+  1.1.3 then failed on missing `pkg_resources`.
+- Dropped the duplicate unversioned `prodigal` apt install (the pinned
+  `prodigal=1:2.6.*` in the HMMER block remains; resolves to 1:2.6.3-5).
+
+### structural changes
+- One merged system-packages stage (base utils, compilers/autotools, -dev libs
+  for R/MOB-suite/plotly/ggtree, small apt bio tools: bedtools, aragorn,
+  mafft, clustalo), replacing ~15 scattered apt installs.
+- Section order: system → docker → venv → gcloud/gcsfuse/dsub (both patches)
+  → R + all R packages → perl modules → java/nextflow → reads (sra-tools,
+  edirect, fastp, seqtk, bwa/samtools, minimap2) → assemblers → taxonomic
+  profiling → gene search/annotation → GTDB-Tk binaries → python packages →
+  StrainFinder (py2) → document rendering → shell conveniences → identity.
+- Python venv installs keep their prior relative order (comment added);
+  macsyfinder's unpinned numpy/pandas force-reinstall stays last.
+- All `APPENDIX-ADDED` marks resolved. Aliases and `glg` moved to the end so
+  editing `glg` no longer invalidates downstream layers.
+
+### tools_versions.sh
+- New `dsub-vm-labels` patch line. The v1.09 snapshot predates it reaching
+  the worker (line absent); patch state was verified via the test VM instead.
+- Fixed `streme` / `fimo` (bare `5.5.9` output) and `infernal` (`INFERNAL`
+  uppercase) grep patterns; v1.09 shows these as ERROR though rc=0.
+
+### operational notes
+- DB rebuild required: no.
+- Denv restart required: yes (also required for the labels to apply).
+- numpy 2.2.6 / pandas 2.3.3, unchanged vs the v1.05 snapshot (no v1.06–v1.08
+  snapshots in the bucket).
+- Known drift in unpinned components: skani 0.3.1 → 0.3.2, edirect 25.3 →
+  26.3, google-cloud-batch → 0.22.0 (pulled by dsub), plus routine apt/CRAN.
+- The v1.08 registry tag was overwritten by an interim build of this image.
+- Config bumps: `modules/cloud/gcp/gcp_int.mk` → `GCP_IMAGE_VER?=v1.09`.
+
 ## v1.08 — 2026-09-07 (mode: mode-2-add)
 
 Patch dsub's continuous log-uploader so a failed log upload can no longer mark
