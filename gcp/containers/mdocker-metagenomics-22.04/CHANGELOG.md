@@ -2,6 +2,30 @@
 
 Newest-first. Each stanza covers the `GCP_IMAGE_VER` label in the heading. For deeper context see git history and the `details.txt` snapshots under `gs://${GCP_PROJECT_ID}-image-tool-versions/mdocker-metagenomics-22.04/vX.YY/{dsub,local}/`.
 
+## v1.10 — 2026-10-27 (mode: mode-2-patch)
+
+Retry `ListJobs` in dsub's google-batch provider so a Batch control-plane
+502/503/504 does not kill `dsub --wait`.
+
+`dsub --wait` is also the spot/on-demand retry loop: a task that fails later
+is only resubmitted while that process is alive. On 2026-10-27 the batch 5
+`t_malign_all` waiter died on a 504 from `lookup_job_tasks` while 86 tasks
+were still running on Batch. Our wrapper read the exit as a failed job,
+ddel'd the live tasks, resubmitted, hit two more 504s and a 502, and gave up.
+
+### local patches
+- New `dsub_list_retry_patch.py`: wraps the `ListJobs` call in
+  `lookup_job_tasks` with a sleep-and-retry (15s/30s/60s backoff, no cap)
+  for `DeadlineExceeded`, `ServiceUnavailable`, `InternalServerError`,
+  `TooManyRequests`, `Aborted`, `BadGateway`, `GatewayTimeout`. Pins
+  `EXPECTED_DSUB_VER=0.5.4`, asserts one call site; idempotent; syntax-checks
+  before writing.
+- No tool version changes.
+
+### notes
+- Takes effect for a job only when the submitting dsub runs from a v1.10
+  container, so denv must be restarted to v1.10 before `p_malign` is rerun.
+
 ## v1.09 — 2026-10-04 (mode: mode-3-reorg)
 
 Label dsub's Batch VMs so billing reports can group by `job-name` and the

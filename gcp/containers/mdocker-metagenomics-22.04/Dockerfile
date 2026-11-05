@@ -178,6 +178,13 @@ RUN python3 /usr/local/share/dsub_logging_patch.py
 COPY dsub_labels_patch.py /usr/local/share/dsub_labels_patch.py
 RUN python3 /usr/local/share/dsub_labels_patch.py
 
+# Retry ListJobs on 502/503/504. dsub --wait is also the spot retry loop, and
+# this call is what exits it. The script fails the build if upstream changed.
+# Upstream fix: DataBiosphere/dsub#343 (merged d88b9be, post-0.5.4). Drop this
+# patch once the pinned dsub tag includes it; upstream does not retry 502.
+COPY dsub_list_retry_patch.py /usr/local/share/dsub_list_retry_patch.py
+RUN python3 /usr/local/share/dsub_list_retry_patch.py
+
 #############################################################################################
 # R
 #############################################################################################
