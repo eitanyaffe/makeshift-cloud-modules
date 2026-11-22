@@ -65,9 +65,10 @@ denv: validate_env
 	docker attach $(CONTAINER_NAME); echo "RC=$$?"; date
 	docker rm $(CONTAINER_NAME)
 
-# denv_ro family: idempotent detached read-only env for agent-driven inspection
+# denv_ro family: idempotent detached read-only env for inspection
 #   - deterministic container name: $(PIPELINE_NAME)-$(PROJECT_NAME)-ro
 #   - source, configs, keys bind-mounted read-only
+#   - figures/ and manuscripts/ (local, under the source tree) bind-mounted read-write
 #   - gcsfuse buckets mounted read-only (GCP_GCSFUSE_EXTRA includes -o ro)
 #   - docker socket NOT mounted (no nested-container escape)
 #   - /tmp stays bind-mounted rw so data can be copied locally for inspection
@@ -93,6 +94,8 @@ denv_ro: validate_env
 		       -e MAKESHIFT_ROOT=/makeshift \
 		       -e MAKESHIFT_LOCAL_PATH=$(MAKESHIFT_ROOT) \
 		       -v $(MAKESHIFT_ROOT):/makeshift:ro \
+		       -v $(MAKESHIFT_ROOT)/figures:/makeshift/figures \
+		       -v $(MAKESHIFT_ROOT)/manuscripts:/makeshift/manuscripts \
 		       -e MAKESHIFT_CONFIG=/makeshift-config \
 		       -e GCP_PROJECT_ID=$(GCP_PROJECT_ID) \
 		       -v $(MAKESHIFT_CONFIG):/makeshift-config:ro \

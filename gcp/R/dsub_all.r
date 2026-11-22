@@ -404,14 +404,15 @@ dsub.base=function(job.work.dir,
                     "--credentials-file", credentials.file,
                     "--logging", logging)
 
-    # note: if emails are needed we can't use the private network
-    if (use.private) {
+    # always pin network/subnetwork so Batch does not invent a regional
+    # networks/default path (CODE_GCE_RESOURCE_NOT_FOUND in us-west1)
+    network = sprintf("https://www.googleapis.com/compute/v1/projects/%s/global/networks/default", project)
+    subnetwork = sprintf("https://www.googleapis.com/compute/v1/projects/%s/regions/%s/subnetworks/default", project, region)
+    command = paste(command, "--network", network)
+    command = paste(command, "--subnetwork", subnetwork)
+    # emails need a public IP; private address only when notify is off
+    if (use.private)
         command = paste(command, "--use-private-address")
-        network = sprintf("https://www.googleapis.com/compute/v1/projects/%s/global/networks/default", project)
-        subnetwork = sprintf("https://www.googleapis.com/compute/v1/projects/%s/regions/%s/subnetworks/default", project, region)
-        command = paste(command, "--network", network)
-        command = paste(command, "--subnetwork", subnetwork)
-    }
 
     command  = paste(command, "--env", paste0("PAR_NOTIFY_EMAIL=", email))
 
